@@ -2,6 +2,8 @@ import mongoose from "mongoose";
 import "@/lib/models/User";
 import "@/lib/models/Bank";
 import "@/lib/models/Asset";
+import "@/lib/models/PublicOffering";
+import "@/lib/models/PriceCache";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 

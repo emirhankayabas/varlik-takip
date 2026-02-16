@@ -29,6 +29,7 @@ interface Asset {
 
 interface AssetWithPrice extends Asset {
   currentPrice?: number;
+  changePercent?: number;
 }
 
 interface AssetTableProps {
@@ -42,18 +43,42 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
 
   useEffect(() => {
     const fetchPrices = async () => {
-      const updatedData = await Promise.all(
-        assets.map(async (asset) => {
-          try {
-            const res = await fetch(`/api/prices/${asset.symbol}`);
-            const priceData = await res.json();
-            return { ...asset, currentPrice: priceData.price };
-          } catch (error) {
-            return asset;
-          }
-        }),
-      );
-      setData(updatedData);
+      // 1. Benzersiz sembolleri ayıkla (Örn: "BESTE.IS" iki kez varsa tek liste al)
+      const uniqueSymbols = Array.from(new Set(assets.map((a) => a.symbol)));
+
+      try {
+        // 2. Sadece benzersiz semboller için fiyatları çek
+        const priceMap: Record<
+          string,
+          { price: number; changePercent?: number }
+        > = {};
+
+        await Promise.all(
+          uniqueSymbols.map(async (symbol) => {
+            try {
+              const res = await fetch(`/api/prices/${symbol}`);
+              const priceData = await res.json();
+              priceMap[symbol] = {
+                price: priceData.price,
+                changePercent: priceData.changePercent,
+              };
+            } catch (error) {
+              console.error(`${symbol} fiyatı çekilemedi`);
+            }
+          }),
+        );
+
+        // 3. Çekilen bu fiyatları tüm orijinal varlıklara dağıt
+        const updatedData = assets.map((asset) => ({
+          ...asset,
+          currentPrice: priceMap[asset.symbol]?.price,
+          changePercent: priceMap[asset.symbol]?.changePercent,
+        }));
+
+        setData(updatedData);
+      } catch (error) {
+        console.error("Fiyatlar güncellenirken hata oluştu");
+      }
     };
 
     if (assets.length > 0) {
@@ -88,7 +113,9 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
         <TableBody>
           {data.map((asset) => {
             const cost = asset.amount * asset.buyPrice;
-            const currentVal = asset.currentPrice ? asset.amount * asset.currentPrice : null;
+            const currentVal = asset.currentPrice
+              ? asset.amount * asset.currentPrice
+              : null;
             const profit = currentVal ? currentVal - cost : null;
             const profitPercent = profit ? (profit / cost) * 100 : null;
 
@@ -119,12 +146,28 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
                 </TableCell>
                 <TableCell className="text-right">
                   {asset.currentPrice ? (
-                    <span className="text-white font-medium">
-                      ₺{asset.currentPrice.toLocaleString("tr-TR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className="text-white font-medium">
+                        ₺
+                        {asset.currentPrice.toLocaleString("tr-TR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                      {asset.changePercent !== undefined && (
+                        <span
+                          className={cn(
+                            "text-[10px] font-bold px-1 rounded flex items-center gap-0.5",
+                            asset.changePercent >= 0
+                              ? "text-emerald-400 bg-emerald-400/10"
+                              : "text-red-400 bg-red-400/10",
+                          )}
+                        >
+                          {asset.changePercent >= 0 ? "+" : ""}
+                          {asset.changePercent.toFixed(2)}%
+                        </span>
+                      )}
+                    </div>
                   ) : (
                     <Loader2 className="inline h-3 w-3 animate-spin text-zinc-700" />
                   )}
@@ -135,7 +178,7 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
                       <span
                         className={cn(
                           "text-xs font-bold",
-                          profit >= 0 ? "text-emerald-400" : "text-red-400"
+                          profit >= 0 ? "text-emerald-400" : "text-red-400",
                         )}
                       >
                         {profit >= 0 ? "+" : ""}₺
@@ -146,13 +189,13 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
                       <div className="flex items-center justify-end text-[10px] font-bold opacity-80 mt-0.5 whitespace-nowrap">
                         {profit >= 0 ? (
                           <span className="text-emerald-500 flex items-center gap-0.5">
-                            <TrendingUp className="w-2.5 h-2.5" />
-                            %{profitPercent?.toFixed(2)}
+                            <TrendingUp className="w-2.5 h-2.5" />%
+                            {profitPercent?.toFixed(2)}
                           </span>
                         ) : (
                           <span className="text-red-500 flex items-center gap-0.5">
-                            <TrendingDown className="w-2.5 h-2.5" />
-                            %{Math.abs(profitPercent || 0).toFixed(2)}
+                            <TrendingDown className="w-2.5 h-2.5" />%
+                            {Math.abs(profitPercent || 0).toFixed(2)}
                           </span>
                         )}
                       </div>

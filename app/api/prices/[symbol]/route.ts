@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import dbConnect from "@/lib/db";
+import PriceCache from "@/lib/models/PriceCache";
 
 export async function GET(
     request: Request,
@@ -11,11 +13,30 @@ export async function GET(
     }
 
     try {
-        // Yahoo Finance Query API
+        await dbConnect();
+
+        // 1. Önce Cache'e (MongoDB) bak
+        const cachedData = await PriceCache.findOne({ symbol });
+        if (cachedData) {
+            console.log(`Cache Hit: ${symbol}`);
+            return NextResponse.json({
+                symbol: cachedData.symbol,
+                price: cachedData.price,
+                currency: cachedData.currency,
+                previousClose: cachedData.previousClose,
+                change: cachedData.change,
+                changePercent: cachedData.changePercent,
+                isCached: true
+            });
+        }
+
+        console.log(`Cache Miss: ${symbol}. Fetching from API...`);
+
+        // 2. Cache'de yoksa Yahoo Finance'den çek
         const response = await fetch(
             `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`,
             {
-                next: { revalidate: 60 }, // 1 dakika cache
+                next: { revalidate: 300 }, // Next.js seviyesinde de 5 dk tut
             }
         );
 
@@ -34,14 +55,24 @@ export async function GET(
         const currency = result.meta.currency;
         const previousClose = result.meta.previousClose;
 
-        return NextResponse.json({
+        const responseData = {
             symbol,
             price,
             currency,
             previousClose,
             change: price - previousClose,
             changePercent: ((price - previousClose) / previousClose) * 100,
-        });
+        };
+
+        // 3. Çekilen veriyi Cache'e (MongoDB) kaydet
+        // (Vercel'de arka planda sessizce yapabiliriz ama burada beklemek daha garanti)
+        await PriceCache.findOneAndUpdate(
+            { symbol },
+            { ...responseData, createdAt: new Date() },
+            { upsert: true, new: true }
+        );
+
+        return NextResponse.json({ ...responseData, isCached: false });
     } catch (error) {
         console.error("Fiyat çekme hatası:", error);
         return NextResponse.json(
