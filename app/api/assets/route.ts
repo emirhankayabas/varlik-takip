@@ -16,7 +16,11 @@ export async function GET() {
             .sort({ createdAt: -1 });
         return NextResponse.json(assets);
     } catch (error) {
-        return NextResponse.json({ error: "Veriler alınamadı" }, { status: 500 });
+        console.error("API Error (/api/assets):", error);
+        return NextResponse.json({ 
+            error: "Veriler alınamadı",
+            details: error instanceof Error ? error.message : "Bilinmeyen hata"
+        }, { status: 500 });
     }
 }
 
