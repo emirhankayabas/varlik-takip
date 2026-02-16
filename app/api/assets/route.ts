@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Asset from "@/lib/models/Asset";
+import Bank from "@/lib/models/Bank";
 import { auth } from "@/lib/auth";
 
 export async function GET() {
@@ -17,7 +18,7 @@ export async function GET() {
         return NextResponse.json(assets);
     } catch (error) {
         console.error("API Error (/api/assets):", error);
-        return NextResponse.json({ 
+        return NextResponse.json({
             error: "Veriler alınamadı",
             details: error instanceof Error ? error.message : "Bilinmeyen hata"
         }, { status: 500 });

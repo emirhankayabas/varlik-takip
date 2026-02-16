@@ -66,10 +66,6 @@ const AssetSchema = new Schema<IAsset>(
     }
 );
 
-if (models.Asset) {
-    delete (mongoose as any).models.Asset;
-}
-
-const Asset = model<IAsset>("Asset", AssetSchema);
+const Asset = models.Asset || model<IAsset>("Asset", AssetSchema);
 
 export default Asset;

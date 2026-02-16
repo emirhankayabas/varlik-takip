@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Asset from "@/lib/models/Asset";
+import Bank from "@/lib/models/Bank";
 import { auth } from "@/lib/auth";
 
 export async function GET() {
@@ -28,6 +29,10 @@ export async function GET() {
             totalRealizedProfit
         });
     } catch (error) {
-        return NextResponse.json({ error: "Satış verileri alınamadı" }, { status: 500 });
+        console.error("API Error (/api/assets/sales):", error);
+        return NextResponse.json({
+            error: "Satış verileri alınamadı",
+            details: error instanceof Error ? error.message : "Bilinmeyen hata"
+        }, { status: 500 });
     }
 }
