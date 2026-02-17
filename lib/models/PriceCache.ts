@@ -11,7 +11,7 @@ export interface IPriceCache extends Document {
 }
 
 const PriceCacheSchema = new Schema<IPriceCache>({
-    symbol: { type: String, required: true, index: true },
+    symbol: { type: String, required: true },
     price: { type: Number, required: true },
     currency: { type: String, required: true },
     previousClose: { type: Number, required: true },

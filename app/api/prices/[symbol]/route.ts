@@ -18,16 +18,29 @@ export async function GET(
         // 1. Önce Cache'e (MongoDB) bak
         const cachedData = await PriceCache.findOne({ symbol });
         if (cachedData) {
-            console.log(`Cache Hit: ${symbol}`);
-            return NextResponse.json({
-                symbol: cachedData.symbol,
-                price: cachedData.price,
-                currency: cachedData.currency,
-                previousClose: cachedData.previousClose,
-                change: cachedData.change,
-                changePercent: cachedData.changePercent,
-                isCached: true
-            });
+            const now = new Date();
+            const createdAt = new Date(cachedData.createdAt);
+            const diffInMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+
+            // Eğer 5 dakikadan kısaysa cache'den dön
+            if (diffInMinutes < 5) {
+                console.log(`Cache Hit: ${symbol} (${Math.round(diffInMinutes * 60)}s old)`);
+                return NextResponse.json({
+                    symbol: cachedData.symbol,
+                    price: cachedData.price,
+                    currency: cachedData.currency,
+                    previousClose: cachedData.previousClose,
+                    change: cachedData.change,
+                    changePercent: cachedData.changePercent,
+                    isCached: true
+                }, {
+                    headers: {
+                        "Cache-Control": "no-store, max-age=0"
+                    }
+                });
+            } else {
+                console.log(`Cache Stale: ${symbol}. Re-fetching...`);
+            }
         }
 
         console.log(`Cache Miss: ${symbol}. Fetching from API...`);
@@ -72,7 +85,14 @@ export async function GET(
             { upsert: true, new: true }
         );
 
-        return NextResponse.json({ ...responseData, isCached: false });
+        return NextResponse.json(
+            { ...responseData, isCached: false },
+            {
+                headers: {
+                    "Cache-Control": "no-store, max-age=0"
+                }
+            }
+        );
     } catch (error) {
         console.error("Fiyat çekme hatası:", error);
         return NextResponse.json(
