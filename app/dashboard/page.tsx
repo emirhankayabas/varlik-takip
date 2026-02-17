@@ -22,33 +22,52 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [totals, setTotals] = useState({ totalVal: 0, totalProfit: 0, realizedProfit: 0 });
 
-  const fetchAssets = useCallback(async () => {
-    setLoading(true);
+  const fetchAssetsOnly = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
-      const [assetRes, salesRes, ipoRes] = await Promise.all([
+      const [assetRes, salesRes] = await Promise.all([
         fetch("/api/assets"),
-        fetch("/api/assets/sales"),
-        fetch("/api/public-offerings")
+        fetch("/api/assets/sales")
       ]);
 
       const assetData = await assetRes.json();
       const salesData = await salesRes.json();
-      const ipoData = await ipoRes.json();
 
       setAssets(assetData);
-      setPublicOfferings(ipoData);
       setTotals(prev => ({ ...prev, realizedProfit: salesData.totalRealizedProfit || 0 }));
     } catch (error) {
-      console.error("Veriler yüklenemedi");
+      console.error("Varlıklar yüklenemedi");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
+  const fetchIposOnly = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    try {
+      const res = await fetch("/api/public-offerings");
+      const data = await res.json();
+      setPublicOfferings(data);
+    } catch (error) {
+      console.error("Halka arzlar yüklenemedi");
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  }, []);
+
+  const fetchEverything = useCallback(async () => {
+    setLoading(true);
+    await Promise.all([
+      fetchAssetsOnly(false),
+      fetchIposOnly(false)
+    ]);
+    setLoading(false);
+  }, [fetchAssetsOnly, fetchIposOnly]);
+
   useEffect(() => {
     setMounted(true);
-    fetchAssets();
-  }, [fetchAssets]);
+    fetchEverything();
+  }, [fetchEverything]);
 
   useEffect(() => {
     const calculateTotals = async () => {
@@ -189,7 +208,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="animate-in fade-in slide-in-from-top-4 duration-1000">
-          <AssetTable assets={assets} onRefresh={fetchAssets} />
+          <AssetTable assets={assets} onRefresh={() => fetchAssetsOnly(false)} />
         </div>
       )}
 
@@ -215,7 +234,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="animate-in fade-in slide-in-from-top-4 duration-1000">
-          <IpoList offerings={publicOfferings} onRefresh={fetchAssets} />
+          <IpoList offerings={publicOfferings} onRefresh={() => fetchIposOnly(false)} />
         </div>
       )}
 
@@ -223,12 +242,12 @@ export default function DashboardPage() {
       <AssetForm
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
-        onSuccess={fetchAssets}
+        onSuccess={() => fetchAssetsOnly(false)}
       />
       <IpoForm
         open={isIpoFormOpen}
         onOpenChange={setIsIpoFormOpen}
-        onSuccess={fetchAssets}
+        onSuccess={() => fetchIposOnly(false)}
       />
     </main>
   );
