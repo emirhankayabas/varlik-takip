@@ -24,8 +24,7 @@ export const authConfig = {
             }
 
             if (nextUrl.pathname === "/") {
-                if (isLoggedIn) return Response.redirect(new URL("/dashboard", nextUrl));
-                return Response.redirect(new URL("/login", nextUrl));
+                return true;
             }
 
             return true;

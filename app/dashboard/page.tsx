@@ -69,6 +69,22 @@ export default function DashboardPage() {
     fetchEverything();
   }, [fetchEverything]);
 
+  const [agendaIpos, setAgendaIpos] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchAgendaIpos = async () => {
+      try {
+        const res = await fetch("/api/halkarz");
+        const data = await res.json();
+        console.log("Halkarz.com Verileri:", data);
+        setAgendaIpos(data);
+      } catch (error) {
+        console.error("Halkarz verisi çekilemedi:", error);
+      }
+    };
+    fetchAgendaIpos();
+  }, []);
+
   useEffect(() => {
     const calculateTotals = async () => {
       let val = 0;
@@ -177,6 +193,35 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Agenda IPOs */}
+      {agendaIpos.length > 0 && (
+        <div className="mb-12 animate-in fade-in slide-in-from-top-4 duration-1000">
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-2xl font-semibold tracking-tight">Yeni Halka Arzlar</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {agendaIpos.map((ipo, idx) => (
+              <Card key={idx}>
+                <CardHeader>
+                  <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">
+                    {ipo.symbol || "IPO"}
+                  </span>
+                  <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
+                </CardHeader>
+                <CardContent>
+                  <CardTitle className="line-clamp-1">
+                    {ipo.name}
+                  </CardTitle>
+                  <p className="text-xs mt-2 text-zinc-400">
+                    {ipo.date}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Portföy Detayı */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 mt-12">
