@@ -141,6 +141,7 @@ export default function SalesPage() {
                 <TableHead className="text-right">Adet</TableHead>
                 <TableHead className="text-right">Maliyet (₺)</TableHead>
                 <TableHead className="text-right">Satış Fiyatı (₺)</TableHead>
+                <TableHead className="text-right whitespace-nowrap">Toplam Tutar (₺)</TableHead>
                 <TableHead className="text-right">Kar / Zarar</TableHead>
               </TableRow>
             </TableHeader>
@@ -185,6 +186,12 @@ export default function SalesPage() {
                   <TableCell className="text-right text-white font-medium">
                     ₺
                     {sale.buyPrice.toLocaleString("tr-TR", {
+                      minimumFractionDigits: 2,
+                    })}
+                  </TableCell>
+                  <TableCell className="text-right text-emerald-50/90 font-bold">
+                    ₺
+                    {(sale.amount * sale.buyPrice).toLocaleString("tr-TR", {
                       minimumFractionDigits: 2,
                     })}
                   </TableCell>
