@@ -76,7 +76,6 @@ export default function DashboardPage() {
       try {
         const res = await fetch("/api/halkarz");
         const data = await res.json();
-        console.log("Halkarz.com Verileri:", data);
         setAgendaIpos(data);
       } catch (error) {
         console.error("Halkarz verisi çekilemedi:", error);
@@ -204,10 +203,12 @@ export default function DashboardPage() {
             {agendaIpos.map((ipo, idx) => (
               <Card key={idx}>
                 <CardHeader>
-                  <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">
-                    {ipo.symbol || "IPO"}
-                  </span>
-                  <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
+                  <div className="flex items-center gap-x-1">
+                    <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">
+                      {ipo.symbol || "IPO"}
+                    </span>
+                    <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <CardTitle className="line-clamp-1">

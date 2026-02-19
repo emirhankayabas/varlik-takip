@@ -28,23 +28,33 @@ export async function getLatestHalkaArz(): Promise<any> {
             if (text.startsWith('Yeni!')) {
                 const cleaned = text.replace('Yeni!', '').trim();
 
-                // "ATATR                                Ata Turizm ...\n\n11-12-13 Şubat 2026"
-                const lines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+                // Log for debugging
+                // console.log("Cleaned text:", JSON.stringify(cleaned));
 
-                const topRow = lines[0] || '';
-                const date = lines[lines.length - 1] || 'Tarih Belirtilmemiş';
+                const rawLines = cleaned.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
 
-                // "ATATR        Company Name" -> symbol and name
-                const symbolMatch = topRow.match(/^([A-Z0-9]+)\s+(.+)$/);
-                const symbol = symbolMatch ? symbolMatch[1] : '';
-                const name = symbolMatch ? symbolMatch[2].trim() : topRow;
+                // Durum belirteçlerini temizle (Talep toplanıyor, Hazırlanıyor... vb.)
+                const lines = rawLines.filter(line =>
+                    !line.includes("Talep toplanıyor") &&
+                    !line.includes("Talep toplanacak")
+                );
 
-                results.push({
-                    symbol,
-                    name,
-                    date,
-                    link: link.startsWith('http') ? link : `https://halkarz.com${link}`
-                });
+                if (lines.length >= 2) {
+                    const topRow = lines[0];
+                    const date = lines[lines.length - 1];
+
+                    // "ATATR        Company Name" -> symbol and name
+                    const symbolMatch = topRow.match(/^([A-Z0-9]+)\s+(.+)$/);
+                    const symbol = symbolMatch ? symbolMatch[1] : '';
+                    const name = symbolMatch ? symbolMatch[2].trim() : topRow;
+
+                    results.push({
+                        symbol,
+                        name,
+                        date,
+                        link: link.startsWith('http') ? link : `https://halkarz.com${link}`
+                    });
+                }
             }
         });
 

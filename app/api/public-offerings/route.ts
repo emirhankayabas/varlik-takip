@@ -8,7 +8,13 @@ import { auth } from "@/lib/auth";
 async function checkAndProcessIPOs(userId: string) {
     const now = new Date();
 
-    // Statusu ALLOCATED olan ve listingDate'i gelmiş (veya geçmiş) olanları bul
+    // Türkiye saati ile 10:00 kontrolü (Borsa açılışı)
+    // now nesnesi sistem saati ise (UTC+3), hours 10 olmalı.
+    const isAfterOpening = now.getHours() >= 10;
+
+    if (!isAfterOpening) return;
+
+    // Statusu ALLOCATED olan ve listingDate'i bugün veya geçmiş olanları bul
     const ripeIPOs = await PublicOffering.find({
         userId,
         status: "ALLOCATED",
@@ -46,7 +52,8 @@ export async function GET() {
         await checkAndProcessIPOs(session.user.id);
 
         const offerings = await PublicOffering.find({
-            userId: session.user.id
+            userId: session.user.id,
+            status: { $ne: "PORTFOLIO" }
         })
             .populate("bankId")
             .sort({ createdAt: -1 });

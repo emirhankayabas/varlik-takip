@@ -4,19 +4,12 @@ import Link from "next/link";
 import {
   MoveRight,
   BarChart3,
-  ShieldCheck,
-  Zap,
-  Globe,
   ArrowUpRight,
-  Target,
-  LineChart,
   PieChart,
   LayoutDashboard,
-  Wallet,
   TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useSession } from "next-auth/react";
 
