@@ -200,26 +200,41 @@ export default function DashboardPage() {
             <h2 className="text-2xl font-semibold tracking-tight">Yeni Halka Arzlar</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {agendaIpos.map((ipo, idx) => (
-              <Card key={idx}>
-                <CardHeader>
-                  <div className="flex items-center gap-x-1">
-                    <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">
-                      {ipo.symbol || "IPO"}
-                    </span>
-                    <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <CardTitle className="line-clamp-1">
-                    {ipo.name}
-                  </CardTitle>
-                  <p className="text-xs mt-2 text-zinc-400">
-                    {ipo.date}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+            {agendaIpos.map((ipo, idx) => {
+              const isParticipated = publicOfferings.some((p: any) => {
+                const pSymbol = p.symbol.split(".")[0].toUpperCase();
+                const iSymbol = ipo.symbol.toUpperCase();
+                return pSymbol === iSymbol;
+              });
+
+              return (
+                <Card key={idx} className={cn(isParticipated && "border-emerald-500/50 bg-emerald-500/5")}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-x-1">
+                        <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">
+                          {ipo.symbol || "IPO"}
+                        </span>
+                        <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
+                      </div>
+                      {isParticipated && (
+                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
+                          KATILDINIZ
+                        </span>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <CardTitle className="line-clamp-1">
+                      {ipo.name}
+                    </CardTitle>
+                    <p className="text-xs mt-2 text-zinc-400">
+                      {ipo.date}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       )}

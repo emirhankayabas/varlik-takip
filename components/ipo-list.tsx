@@ -140,7 +140,7 @@ export function IpoList({ offerings, onRefresh }: IpoListProps) {
                                 <TableRow key={ipo._id} className="group">
                                     <TableCell>
                                         <div className="flex flex-col">
-                                            <span className="font-bold text-sm tracking-tight">{ipo.symbol}</span>
+                                            <span className="font-bold text-sm tracking-tight">{ipo.symbol.replace(".IS", "")}</span>
                                             <span className="text-[10px] text-zinc-500 font-medium">Halka Arz Talebi</span>
                                         </div>
                                     </TableCell>

@@ -22,10 +22,16 @@ async function checkAndProcessIPOs(userId: string) {
     });
 
     for (const ipo of ripeIPOs) {
+        // Sembolün sonuna .IS ekle (eğer borsa değilse ve kullanıcı eklememişse)
+        let symbol = ipo.symbol.toUpperCase();
+        if (!symbol.includes(".")) {
+            symbol = `${symbol}.IS`;
+        }
+
         // Assets tablosuna ekle
         await Asset.create({
             userId,
-            symbol: ipo.symbol,
+            symbol,
             amount: ipo.allocatedAmount,
             buyPrice: ipo.price,
             buyDate: ipo.listingDate || now,
@@ -78,8 +84,15 @@ export async function POST(request: Request) {
         const body = await request.json();
         await dbConnect();
 
+        // Sembolün sonuna .IS ekle
+        let symbol = body.symbol.toUpperCase();
+        if (!symbol.includes(".")) {
+            symbol = `${symbol}.IS`;
+        }
+
         const newOffering = await PublicOffering.create({
             ...body,
+            symbol,
             userId: session.user.id,
             status: "PENDING"
         });
