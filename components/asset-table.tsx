@@ -106,6 +106,7 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
             <TableHead className="text-right">Adet</TableHead>
             <TableHead className="text-right">Maliyet (₺)</TableHead>
             <TableHead className="text-right">Fiyat (₺)</TableHead>
+            <TableHead className="text-right">Toplam Değer</TableHead>
             <TableHead className="text-right">Performans</TableHead>
             <TableHead className="w-10 "></TableHead>
           </TableRow>
@@ -170,6 +171,18 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
                     </div>
                   ) : (
                     <Loader2 className="inline h-3 w-3 animate-spin text-zinc-700" />
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  {currentVal !== null ? (
+                    <span className="font-bold text-zinc-100">
+                      ₺{currentVal.toLocaleString("tr-TR", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                  ) : (
+                    <span className="text-zinc-700">-</span>
                   )}
                 </TableCell>
                 <TableCell className="text-right">

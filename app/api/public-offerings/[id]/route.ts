@@ -20,7 +20,7 @@ export async function PATCH(
         const updatedOffering = await PublicOffering.findOneAndUpdate(
             { _id: id, userId: session.user.id },
             { ...body },
-            { new: true }
+            { returnDocument: "after" }
         );
 
         if (!updatedOffering) {
