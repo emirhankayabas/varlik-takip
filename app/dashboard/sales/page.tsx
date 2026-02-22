@@ -67,7 +67,7 @@ export default function SalesPage() {
   };
 
   return (
-    <div className="container mx-auto px-6 py-10 max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="container mx-auto px-6 py-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <div className="flex items-center gap-2 mb-2">
@@ -75,7 +75,6 @@ export default function SalesPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all"
               >
                 <ArrowLeft className="w-4 h-4" />
               </Button>
@@ -91,7 +90,7 @@ export default function SalesPage() {
 
         <Card className="min-w-60 bg-zinc-950/50 border-zinc-900 gap-0!">
           <CardHeader>
-            <CardDescription className="text-xs uppercase tracking-wider font-bold text-zinc-600">
+            <CardDescription className="text-xs">
               Toplam Net Kazanç
             </CardDescription>
           </CardHeader>
@@ -149,11 +148,11 @@ export default function SalesPage() {
               {sales.map((sale) => (
                 <TableRow
                   key={sale._id}
-                  className="border-zinc-900 hover:bg-zinc-900/40 transition-colors group"
+                  className="group"
                 >
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className="font-bold text-sm tracking-tight text-white group-hover:text-emerald-400 transition-colors">
+                      <span className="font-bold text-sm tracking-tight text-white transition-colors">
                         {sale.symbol.replace(".IS", "")}
                       </span>
                       <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-medium">

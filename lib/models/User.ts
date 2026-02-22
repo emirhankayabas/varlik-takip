@@ -5,6 +5,7 @@ export interface IUser {
     email: string;
     password: string;
     name?: string;
+    cryptoWatchlist?: { id: string; symbol: string; name: string; image: string }[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -25,6 +26,21 @@ const UserSchema = new Schema<IUser>(
         name: {
             type: String,
             trim: true,
+        },
+        cryptoWatchlist: {
+            type: [{
+                id: String,
+                symbol: String,
+                name: String,
+                image: String
+            }],
+            default: [
+                { id: "bitcoin", symbol: "BTC", name: "Bitcoin", image: "https://assets.coingecko.com/coins/images/1/small/bitcoin.png" },
+                { id: "ethereum", symbol: "ETH", name: "Ethereum", image: "https://assets.coingecko.com/coins/images/279/small/ethereum.png" },
+                { id: "solana", symbol: "SOL", name: "Solana", image: "https://assets.coingecko.com/coins/images/4128/small/solana.png" },
+                { id: "ripple", symbol: "XRP", name: "Ripple", image: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png" },
+                { id: "dogecoin", symbol: "DOGE", name: "Dogecoin", image: "https://assets.coingecko.com/coins/images/5/small/dogecoin.png" },
+            ],
         },
     },
     {
