@@ -9,9 +9,11 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { FundSellDialog } from "./fund-sell-dialog";
 
 interface FundAsset {
     _id: string;
@@ -39,6 +41,7 @@ interface FundTableProps {
 
 export function FundTable({ funds, onRefresh }: FundTableProps) {
     const [data, setData] = useState<FundWithPrice[]>([]);
+    const [sellingAsset, setSellingAsset] = useState<FundWithPrice | null>(null);
 
     useEffect(() => {
         const fetchPrices = async () => {
@@ -109,6 +112,7 @@ export function FundTable({ funds, onRefresh }: FundTableProps) {
                         <TableHead className="text-right">Günlük</TableHead>
                         <TableHead className="text-right">Toplam Değer</TableHead>
                         <TableHead className="text-right">Performans</TableHead>
+                        <TableHead className="w-10 "></TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -230,11 +234,34 @@ export function FundTable({ funds, onRefresh }: FundTableProps) {
                                         <span className="text-zinc-700">-</span>
                                     )}
                                 </TableCell>
+                                <TableCell className="text-center">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setSellingAsset(fund)}
+                                        className="h-8 w-8 rounded-full text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-all"
+                                    >
+                                        <TrendingDown className="h-4 w-4" />
+                                    </Button>
+                                </TableCell>
                             </TableRow>
                         );
                     })}
                 </TableBody>
             </Table>
+
+            {sellingAsset && (
+                <FundSellDialog
+                    open={!!sellingAsset}
+                    onOpenChange={(open) => !open && setSellingAsset(null)}
+                    fundId={sellingAsset._id}
+                    symbol={sellingAsset.symbol}
+                    currentAmount={sellingAsset.amount}
+                    avgBuyPrice={sellingAsset.buyPrice}
+                    currentPrice={sellingAsset.currentPrice}
+                    onSuccess={onRefresh}
+                />
+            )}
         </div>
     );
 }
