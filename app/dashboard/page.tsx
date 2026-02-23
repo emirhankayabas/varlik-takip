@@ -227,7 +227,7 @@ export default function DashboardPage() {
   if (!mounted) return null;
 
   return (
-    <main className="container mx-auto px-6 py-10 max-w-6xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <main className="container mx-auto px-6 py-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Özet Kartları */}
       {/* Özet Kartları */}
       {/* Özet Kartları */}
