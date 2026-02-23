@@ -25,8 +25,9 @@ export async function GET(
             const createdAt = new Date(cachedData.createdAt);
             const diffInMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
 
-            // Eğer 30 dakikadan kısaysa cache'den dön (Fonlar günlük güncellenir)
-            if (diffInMinutes < 30) {
+            // Fonlar günlük güncellendiği için 12 saatlik (720 dk) cache yeterli
+            if (diffInMinutes < 720) {
+                console.log(`Fon Cache Hit: ${symbol} (${Math.round(diffInMinutes)} dk önce güncellendi)`);
                 return NextResponse.json({
                     symbol: symbol.toUpperCase(),
                     price: cachedData.price,
