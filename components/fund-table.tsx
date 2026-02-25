@@ -36,60 +36,25 @@ interface FundWithPrice extends FundAsset {
 
 interface FundTableProps {
     funds: FundAsset[];
+    priceMap: Record<string, { price: number; changePercent?: number; change?: number; name?: string }>;
     onRefresh: () => void;
 }
 
-export function FundTable({ funds, onRefresh }: FundTableProps) {
+export function FundTable({ funds, priceMap, onRefresh }: FundTableProps) {
     const [data, setData] = useState<FundWithPrice[]>([]);
     const [sellingAsset, setSellingAsset] = useState<FundWithPrice | null>(null);
 
     useEffect(() => {
-        const fetchPrices = async () => {
-            const uniqueSymbols = Array.from(new Set(funds.map((f) => f.symbol)));
+        const updatedData = funds.map((fund) => ({
+            ...fund,
+            currentPrice: priceMap[fund.symbol]?.price,
+            changePercent: priceMap[fund.symbol]?.changePercent,
+            dailyChange: priceMap[fund.symbol]?.change,
+            name: priceMap[fund.symbol]?.name,
+        }));
 
-            try {
-                const priceMap: Record<
-                    string,
-                    { price: number; changePercent?: number; dailyChange?: number; name?: string }
-                > = {};
-
-                await Promise.all(
-                    uniqueSymbols.map(async (symbol) => {
-                        try {
-                            const res = await fetch(`/api/prices/fund/${symbol}`);
-                            const priceData = await res.json();
-                            priceMap[symbol] = {
-                                price: priceData.price,
-                                changePercent: priceData.changePercent,
-                                dailyChange: priceData.change,
-                                name: priceData.name,
-                            };
-                        } catch (error) {
-                            console.error(`${symbol} fiyatı çekilemedi`);
-                        }
-                    }),
-                );
-
-                const updatedData = funds.map((fund) => ({
-                    ...fund,
-                    currentPrice: priceMap[fund.symbol]?.price,
-                    changePercent: priceMap[fund.symbol]?.changePercent,
-                    dailyChange: priceMap[fund.symbol]?.dailyChange,
-                    name: priceMap[fund.symbol]?.name,
-                }));
-
-                setData(updatedData);
-            } catch (error) {
-                console.error("Fiyatlar güncellenirken hata oluştu");
-            }
-        };
-
-        if (funds.length > 0) {
-            fetchPrices();
-        } else {
-            setData([]);
-        }
-    }, [funds]);
+        setData(updatedData);
+    }, [funds, priceMap]);
 
     if (funds.length === 0) {
         return (

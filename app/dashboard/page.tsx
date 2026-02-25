@@ -31,6 +31,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("bist");
   const [usdRate, setUsdRate] = useState(1);
+  const [priceMap, setPriceMap] = useState<Record<string, { price: number; changePercent?: number }>>({});
+  const [fundPriceMap, setFundPriceMap] = useState<Record<string, { price: number; changePercent?: number; change?: number; name?: string }>>({});
   const [totals, setTotals] = useState({
     totalVal: 0,
     totalProfit: 0,
@@ -161,26 +163,34 @@ export default function DashboardPage() {
       const uniqueSymbols = Array.from(new Set(assets.map((a: any) => a.symbol)));
 
       // 2. Sembol bazlı güncel fiyatları tek seferde çek
-      const priceMap: Record<string, number> = {};
+      const currentPriceMap: Record<string, { price: number; changePercent?: number }> = {};
       await Promise.all(
         uniqueSymbols.map(async (symbol) => {
           try {
             const res = await fetch(`/api/prices/${symbol}`);
             const p = await res.json();
-            priceMap[symbol] = p.price;
+            currentPriceMap[symbol] = {
+              price: p.price,
+              changePercent: p.changePercent
+            };
           } catch (e) { }
         })
       );
 
       // 3. Fonlar için sembol bazlı güncel fiyatları çek
       const uniqueFundSymbols = Array.from(new Set(funds.map((f: any) => f.symbol)));
-      const fundPriceMap: Record<string, number> = {};
+      const currentFundPriceMap: Record<string, { price: number; changePercent?: number; change?: number; name?: string }> = {};
       await Promise.all(
         uniqueFundSymbols.map(async (symbol) => {
           try {
             const res = await fetch(`/api/prices/fund/${symbol}`);
             const p = await res.json();
-            fundPriceMap[symbol] = p.price;
+            currentFundPriceMap[symbol] = {
+              price: p.price,
+              changePercent: p.changePercent,
+              change: p.change,
+              name: p.name
+            };
           } catch (e) { }
         })
       );
@@ -207,8 +217,9 @@ export default function DashboardPage() {
 
       // 4. Toplamları hesapla (Hisseler)
       for (const asset of assets as any[]) {
-        const currentPrice = priceMap[asset.symbol];
-        if (currentPrice !== undefined) {
+        const priceData = currentPriceMap[asset.symbol];
+        if (priceData !== undefined) {
+          const currentPrice = priceData.price;
           const itemVal = asset.amount * currentPrice;
           const itemProfit = itemVal - asset.amount * asset.buyPrice;
 
@@ -229,8 +240,9 @@ export default function DashboardPage() {
 
       // 5. Toplamları hesapla (Fonlar)
       for (const fund of funds as any[]) {
-        const currentPrice = fundPriceMap[fund.symbol];
-        if (currentPrice !== undefined) {
+        const priceData = currentFundPriceMap[fund.symbol];
+        if (priceData !== undefined) {
+          const currentPrice = priceData.price;
           const itemVal = fund.amount * currentPrice;
           const itemProfit = itemVal - fund.amount * fund.buyPrice;
           val += itemVal;
@@ -240,6 +252,8 @@ export default function DashboardPage() {
         }
       }
 
+      setPriceMap(currentPriceMap);
+      setFundPriceMap(currentFundPriceMap);
       setTotals(prev => ({
         ...prev,
         totalVal: val,
@@ -426,7 +440,7 @@ export default function DashboardPage() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <AssetTable assets={assets} market="BIST" onRefresh={() => fetchAssetsOnly(false)} />
+                <AssetTable assets={assets} market="BIST" priceMap={priceMap} onRefresh={() => fetchAssetsOnly(false)} />
               </motion.div>
             </AnimatePresence>
           )}
@@ -456,7 +470,7 @@ export default function DashboardPage() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <AssetTable assets={assets} market="US" onRefresh={() => fetchAssetsOnly(false)} />
+                <AssetTable assets={assets} market="US" priceMap={priceMap} onRefresh={() => fetchAssetsOnly(false)} />
               </motion.div>
             </AnimatePresence>
           )}
@@ -486,7 +500,7 @@ export default function DashboardPage() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <FundTable funds={funds} onRefresh={() => fetchFundsOnly(false)} />
+                <FundTable funds={funds} priceMap={fundPriceMap} onRefresh={() => fetchFundsOnly(false)} />
               </motion.div>
             </AnimatePresence>
           )}

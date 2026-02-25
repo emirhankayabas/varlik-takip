@@ -36,62 +36,27 @@ interface AssetWithPrice extends Asset {
 interface AssetTableProps {
   assets: Asset[];
   market: "BIST" | "US";
+  priceMap: Record<string, { price: number; changePercent?: number }>;
   onRefresh: () => void;
 }
 
-export function AssetTable({ assets, market, onRefresh }: AssetTableProps) {
+export function AssetTable({ assets, market, priceMap, onRefresh }: AssetTableProps) {
   const [data, setData] = useState<AssetWithPrice[]>([]);
   const [sellingAsset, setSellingAsset] = useState<AssetWithPrice | null>(null);
 
   const currencySymbol = market === "BIST" ? "₺" : "$";
 
   useEffect(() => {
-    const fetchPrices = async () => {
-      // 1. Filtrele ve benzersiz sembolleri ayıkla
-      const filteredAssets = assets.filter(a => a.market === market);
-      const uniqueSymbols = Array.from(new Set(filteredAssets.map((a) => a.symbol)));
+    // Sadece filtrele ve prop'tan gelen fiyatları eşleştir
+    const filteredAssets = assets.filter(a => a.market === market);
+    const updatedData = filteredAssets.map((asset) => ({
+      ...asset,
+      currentPrice: priceMap[asset.symbol]?.price,
+      changePercent: priceMap[asset.symbol]?.changePercent,
+    }));
 
-      try {
-        // 2. Sadece benzersiz semboller için fiyatları çek
-        const priceMap: Record<
-          string,
-          { price: number; changePercent?: number }
-        > = {};
-
-        await Promise.all(
-          uniqueSymbols.map(async (symbol) => {
-            try {
-              const res = await fetch(`/api/prices/${symbol}`);
-              const priceData = await res.json();
-              priceMap[symbol] = {
-                price: priceData.price,
-                changePercent: priceData.changePercent,
-              };
-            } catch (error) {
-              console.error(`${symbol} fiyatı çekilemedi`);
-            }
-          }),
-        );
-
-        // 3. Çekilen bu fiyatları tüm orijinal varlıklara dağıt
-        const updatedData = filteredAssets.map((asset) => ({
-          ...asset,
-          currentPrice: priceMap[asset.symbol]?.price,
-          changePercent: priceMap[asset.symbol]?.changePercent,
-        }));
-
-        setData(updatedData);
-      } catch (error) {
-        console.error("Fiyatlar güncellenirken hata oluştu");
-      }
-    };
-
-    if (assets.length > 0) {
-      fetchPrices();
-    } else {
-      setData([]);
-    }
-  }, [assets, market]);
+    setData(updatedData);
+  }, [assets, market, priceMap]);
 
   if (data.length === 0) {
     return (
