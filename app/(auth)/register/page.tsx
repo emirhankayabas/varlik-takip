@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Apple, Wallet, Lock } from "lucide-react";
 import { toast } from "sonner";
+import { signIn } from "next-auth/react";
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -32,10 +33,26 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (response.ok) {
-        toast.success("Hesap başarıyla oluşturuldu! Yönlendiriliyorsunuz...");
-        setTimeout(() => {
+        // Otomatik giriş yap
+        const result = await signIn("credentials", {
+          email: formData.email,
+          password: formData.password,
+          redirect: false,
+        });
+
+        if (result?.error) {
+          toast.error("Kaydolduktan sonra giriş yapılamadı.");
           router.push("/login");
-        }, 2000);
+          return;
+        }
+
+        if (data.pendingVerification) {
+          toast.success("Hesap oluşturuldu! Doğrulama kodunuz gönderildi.");
+          router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+        } else {
+          toast.success("Hesap başarıyla oluşturuldu! Yönlendiriliyorsunuz...");
+          router.push("/dashboard");
+        }
       } else {
         toast.error(data.error || data.message || "Kayıt sırasında bir hata oluştu.");
       }
@@ -68,15 +85,9 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {/* Register Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label
-              htmlFor="name"
-              className="text-xs font-medium text-zinc-400 ml-1"
-            >
-              Ad Soyad
-            </Label>
+            <Label htmlFor="name">Ad Soyad</Label>
             <Input
               id="name"
               type="text"
@@ -88,12 +99,7 @@ export default function RegisterPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label
-              htmlFor="email"
-              className="text-xs font-medium text-zinc-400 ml-1"
-            >
-              E-posta
-            </Label>
+            <Label htmlFor="email">E-posta</Label>
             <Input
               id="email"
               type="email"
@@ -106,12 +112,7 @@ export default function RegisterPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label
-              htmlFor="password"
-              className="text-xs font-medium text-zinc-400 ml-1"
-            >
-              Şifre
-            </Label>
+            <Label htmlFor="password">Şifre</Label>
             <Input
               id="password"
               type="password"
@@ -133,7 +134,7 @@ export default function RegisterPage() {
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <>
-                <Lock className="h-4 w-4" />
+                <Lock className="h-4 w-4 mr-2" />
                 Hesap Oluştur
               </>
             )}
@@ -156,27 +157,15 @@ export default function RegisterPage() {
         <div className="grid grid-cols-2 gap-3">
           <Button
             variant="outline"
-            className=" border-zinc-800 bg-transparent text-white hover:bg-zinc-900 transition-all font-medium"
+            className=" border-zinc-800 bg-transparent text-white hover:bg-zinc-900 transition-all font-medium h-10"
             type="button"
           >
-            <svg
-              className="mr-2 h-4 w-4"
-              aria-hidden="true"
-              focusable="false"
-              role="img"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 384 512"
-            >
-              <path
-                fill="currentColor"
-                d="M318.7 268.7c-.2-36.3 16.4-67.1 49.6-86.8-17.3-25.1-44.2-39.7-74.1-41.6-34.8-2.4-66.5 21.3-84.1 21.3-17.5 0-44.8-19.1-73.6-18.1-38 1.4-73.1 23.1-92.6 57.1-39.6 69.1-10.1 171.3 28.5 227 18.9 27.3 41.5 57.8 70.8 56.7 28.3-1.1 38.9-18.2 73.1-18.2 34.1 0 43.6 18.2 73.6 17.6 30.7-.5 50.4-27.4 69.2-54.6 21.7-31.4 30.6-61.9 31-63.4-.7-.3-60.1-23.2-60.3-91.3zM277.5 70.4c15.6-18.8 26.1-44.8 23.2-70.4-22.4 1-49.1 15-65.1 33.7-14.3 16.6-26.8 43.3-23.4 68 24.8 1.9 49.7-12.6 65.3-31.3z"
-              ></path>
-            </svg>
+            <Apple className="mr-2 h-4 w-4" />
             Apple
           </Button>
           <Button
             variant="outline"
-            className=" border-zinc-800 bg-transparent text-white hover:bg-zinc-900 transition-all font-medium"
+            className=" border-zinc-800 bg-transparent text-white hover:bg-zinc-900 transition-all font-medium h-10"
             type="button"
           >
             <svg
@@ -199,7 +188,7 @@ export default function RegisterPage() {
         </div>
 
         {/* Footer */}
-        <p className="px-8 text-center text-[10px] leading-relaxed text-zinc-500">
+        <p className="px-8 text-center text-[10px] leading-relaxed text-zinc-500 pt-4">
           Kayıt olarak{" "}
           <Link
             href="/terms"

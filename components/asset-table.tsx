@@ -20,6 +20,7 @@ interface Asset {
   symbol: string;
   amount: number;
   buyPrice: number;
+  market: "BIST" | "US";
   bankId?: {
     _id: string;
     name: string;
@@ -34,17 +35,21 @@ interface AssetWithPrice extends Asset {
 
 interface AssetTableProps {
   assets: Asset[];
+  market: "BIST" | "US";
   onRefresh: () => void;
 }
 
-export function AssetTable({ assets, onRefresh }: AssetTableProps) {
+export function AssetTable({ assets, market, onRefresh }: AssetTableProps) {
   const [data, setData] = useState<AssetWithPrice[]>([]);
   const [sellingAsset, setSellingAsset] = useState<AssetWithPrice | null>(null);
 
+  const currencySymbol = market === "BIST" ? "₺" : "$";
+
   useEffect(() => {
     const fetchPrices = async () => {
-      // 1. Benzersiz sembolleri ayıkla (Örn: "BESTE.IS" iki kez varsa tek liste al)
-      const uniqueSymbols = Array.from(new Set(assets.map((a) => a.symbol)));
+      // 1. Filtrele ve benzersiz sembolleri ayıkla
+      const filteredAssets = assets.filter(a => a.market === market);
+      const uniqueSymbols = Array.from(new Set(filteredAssets.map((a) => a.symbol)));
 
       try {
         // 2. Sadece benzersiz semboller için fiyatları çek
@@ -69,7 +74,7 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
         );
 
         // 3. Çekilen bu fiyatları tüm orijinal varlıklara dağıt
-        const updatedData = assets.map((asset) => ({
+        const updatedData = filteredAssets.map((asset) => ({
           ...asset,
           currentPrice: priceMap[asset.symbol]?.price,
           changePercent: priceMap[asset.symbol]?.changePercent,
@@ -86,26 +91,26 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
     } else {
       setData([]);
     }
-  }, [assets]);
+  }, [assets, market]);
 
-  if (assets.length === 0) {
+  if (data.length === 0) {
     return (
       <div className="text-center py-20 bg-zinc-950/20 rounded-3xl border border-zinc-900 border-dashed">
-        <p className="text-zinc-500 text-sm">Hala bir varlık eklemediniz.</p>
+        <p className="text-zinc-500 text-sm">Bu piyasada henüz bir varlık eklemediniz.</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-950/30 overflow-hidden backdrop-blur-sm shadow-2xl animate-in fade-in slide-in-from-top-4 duration-1000">
+    <div className="rounded-xl border border-zinc-800 bg-zinc-950/30 overflow-hidden backdrop-blur-sm shadow-2xl">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>Hisse</TableHead>
             <TableHead>Kurum</TableHead>
             <TableHead className="text-right">Adet</TableHead>
-            <TableHead className="text-right">Maliyet (₺)</TableHead>
-            <TableHead className="text-right">Fiyat (₺)</TableHead>
+            <TableHead className="text-right">Maliyet ({currencySymbol})</TableHead>
+            <TableHead className="text-right">Fiyat ({currencySymbol})</TableHead>
             <TableHead className="text-right">Toplam Değer</TableHead>
             <TableHead className="text-right">Performans</TableHead>
             <TableHead className="w-10 "></TableHead>
@@ -124,23 +129,23 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
               <TableRow key={asset._id} className=" group">
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="font-bold text-sm tracking-tight">
+                    <span className="font-bold text-sm tracking-tight text-white">
                       {asset.symbol.replace(".IS", "")}
                     </span>
                     <span className="text-[10px] text-zinc-500 font-medium">
-                      Portföy Varlığı
+                      {market === "BIST" ? "Borsa İstanbul" : "ABD Borsası"}
                     </span>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline">
+                  <Badge variant="outline" className="border-zinc-800 text-zinc-400">
                     {asset.bankId?.name || "Bilinmiyor"}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right">{asset.amount}</TableCell>
-                <TableCell className="text-right">
-                  ₺
-                  {asset.buyPrice.toLocaleString("tr-TR", {
+                <TableCell className="text-right font-medium text-zinc-300">{asset.amount}</TableCell>
+                <TableCell className="text-right text-zinc-300">
+                  {currencySymbol}
+                  {asset.buyPrice.toLocaleString(market === "BIST" ? "tr-TR" : "en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
@@ -149,8 +154,8 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
                   {asset.currentPrice ? (
                     <div className="flex flex-col items-end gap-1">
                       <span className="text-white font-medium">
-                        ₺
-                        {asset.currentPrice.toLocaleString("tr-TR", {
+                        {currencySymbol}
+                        {asset.currentPrice.toLocaleString(market === "BIST" ? "tr-TR" : "en-US", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
@@ -176,7 +181,7 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
                 <TableCell className="text-right">
                   {currentVal !== null ? (
                     <span className="font-bold text-zinc-100">
-                      ₺{currentVal.toLocaleString("tr-TR", {
+                      {currencySymbol}{currentVal.toLocaleString(market === "BIST" ? "tr-TR" : "en-US", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
@@ -194,8 +199,8 @@ export function AssetTable({ assets, onRefresh }: AssetTableProps) {
                           profit >= 0 ? "text-emerald-400" : "text-red-400",
                         )}
                       >
-                        {profit >= 0 ? "+" : ""}₺
-                        {profit.toLocaleString("tr-TR", {
+                        {profit >= 0 ? "+" : ""}{currencySymbol}
+                        {profit.toLocaleString(market === "BIST" ? "tr-TR" : "en-US", {
                           maximumFractionDigits: 0,
                         })}
                       </span>

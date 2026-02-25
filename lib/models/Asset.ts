@@ -11,6 +11,7 @@ export interface IAsset {
     type: "BUY" | "SELL";
     realizedProfit?: number; // Calculated only for SELL transactions
     costBasis?: number;      // The average cost at the time of sale (for SELL only)
+    market: "BIST" | "US";
     createdAt: Date;
     updatedAt: Date;
 }
@@ -51,6 +52,11 @@ const AssetSchema = new Schema<IAsset>(
             type: String,
             enum: ["BUY", "SELL"],
             default: "BUY",
+        },
+        market: {
+            type: String,
+            enum: ["BIST", "US"],
+            default: "BIST",
         },
         realizedProfit: {
             type: Number,

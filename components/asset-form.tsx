@@ -54,6 +54,7 @@ const formSchema = z.object({
   amount: z.coerce.number().positive("Adet 0'dan büyük olmalıdır."),
   buyPrice: z.coerce.number().positive("Fiyat 0'dan büyük olmalıdır."),
   bankId: z.string().min(1, "Banka seçimi zorunludur."),
+  market: z.enum(["BIST", "US"]).default("BIST"),
   buyDate: z.date({
     message: "İşlem tarihi zorunludur.",
   }),
@@ -63,6 +64,7 @@ interface AssetFormValues {
   symbol: string;
   amount: number;
   buyPrice: number;
+  market: "BIST" | "US";
   bankId: string;
   buyDate: Date;
 }
@@ -71,6 +73,7 @@ interface AssetFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  initialMarket?: "BIST" | "US";
 }
 
 interface Bank {
@@ -78,14 +81,22 @@ interface Bank {
   name: string;
 }
 
-export function AssetForm({ open, onOpenChange, onSuccess }: AssetFormProps) {
+export function AssetForm({ open, onOpenChange, onSuccess, initialMarket = "BIST" }: AssetFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [isBankManagerOpen, setIsBankManagerOpen] = useState(false);
 
-  useEffect(() => {
-    if (open) fetchBanks();
-  }, [open]);
+  const form = useForm<AssetFormValues>({
+    resolver: zodResolver(formSchema) as Resolver<AssetFormValues>,
+    defaultValues: {
+      symbol: "",
+      amount: 0,
+      buyPrice: 0,
+      bankId: "",
+      market: initialMarket,
+      buyDate: new Date(),
+    },
+  });
 
   const fetchBanks = async () => {
     try {
@@ -97,16 +108,21 @@ export function AssetForm({ open, onOpenChange, onSuccess }: AssetFormProps) {
     }
   };
 
-  const form = useForm<AssetFormValues>({
-    resolver: zodResolver(formSchema) as Resolver<AssetFormValues>,
-    defaultValues: {
-      symbol: "",
-      amount: 0,
-      buyPrice: 0,
-      bankId: "",
-      buyDate: new Date(),
-    },
-  });
+  useEffect(() => {
+    if (open) {
+      fetchBanks();
+      form.reset({
+        symbol: "",
+        amount: 0,
+        buyPrice: 0,
+        bankId: "",
+        market: initialMarket,
+        buyDate: new Date(),
+      });
+    }
+  }, [open, initialMarket, form]);
+
+  const watchMarket = form.watch("market");
 
   const onSubmit = async (values: AssetFormValues) => {
     setIsSubmitting(true);
@@ -147,12 +163,32 @@ export function AssetForm({ open, onOpenChange, onSuccess }: AssetFormProps) {
             >
               <FormField
                 control={form.control}
+                name="market"
+                render={({ field }) => (
+                  <FormItem className="space-y-1.5">
+                    <FormLabel>Piyasa</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Piyasa seçin" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="BIST">Borsa İstanbul (BIST)</SelectItem>
+                        <SelectItem value="US">ABD Borsaları (NASDAQ/NYSE)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
                 name="symbol"
                 render={({ field }) => (
                   <FormItem className="space-y-1.5">
                     <FormLabel>Sembol</FormLabel>
                     <FormControl>
-                      <Input placeholder="THYAO" {...field} />
+                      <Input placeholder={watchMarket === "BIST" ? "THYAO" : "AAPL"} {...field} />
                     </FormControl>
                     <FormMessage className="text-[10px] text-red-400 font-medium" />
                   </FormItem>
@@ -177,7 +213,7 @@ export function AssetForm({ open, onOpenChange, onSuccess }: AssetFormProps) {
                   name="buyPrice"
                   render={({ field }) => (
                     <FormItem className="space-y-1.5">
-                      <FormLabel>Alış Fiyatı (₺)</FormLabel>
+                      <FormLabel>Alış Fiyatı ({watchMarket === "BIST" ? "₺" : "$"})</FormLabel>
                       <FormControl>
                         <Input type="number" step="any" {...field} />
                       </FormControl>

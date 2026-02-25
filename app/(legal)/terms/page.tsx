@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-black text-white p-8 md:p-24 selection:bg-white/20">
+    <div className="bg-black text-white p-8 md:p-24 selection:bg-white/20">
       <div className="max-w-2xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
         {/* Navigation */}
         <Link href="/login">

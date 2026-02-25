@@ -24,7 +24,7 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#050505] text-white selection:bg-primary/30 font-sans">
+    <div className="flex flex-col bg-[#050505] text-white selection:bg-primary/30 font-sans">
       {/* Navbar */}
       <header className="fixed top-0 w-full z-50 border-b border-white/5 bg-black/40 backdrop-blur-xl">
         <div className="container mx-auto flex h-16 items-center justify-between px-6">

@@ -79,6 +79,12 @@ export default function LoginPage() {
           <div className="space-y-2">
             <div className="flex items-center justify-between ml-1">
               <Label htmlFor="password">Şifre</Label>
+              <Link
+                href="/forgot-password"
+                className="text-xs text-zinc-400 hover:text-white transition-colors"
+              >
+                Şifremi Unuttum
+              </Link>
             </div>
             <Input
               id="password"
@@ -91,7 +97,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p className="text-xs text-red-500 font-medium text-center animate-shake">
+            <p className="text-xs text-red-500 font-medium text-center animate-shake p-2 bg-red-500/10 rounded-lg">
               {error}
             </p>
           )}

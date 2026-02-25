@@ -28,15 +28,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     id: user._id.toString(),
                     email: user.email,
                     name: user.name,
+                    emailVerified: user.emailVerified,
                 };
             },
         }),
     ],
     callbacks: {
         ...authConfig.callbacks,
+        async jwt({ token, user, trigger, session }) {
+            if (user) {
+                token.id = user.id;
+                token.emailVerified = (user as any).emailVerified;
+            }
+            if (trigger === "update" && session?.emailVerified !== undefined) {
+                token.emailVerified = session.emailVerified;
+            }
+            return token;
+        },
         async session({ session, token }) {
-            if (token.sub && session.user) {
-                session.user.id = token.sub;
+            if (token.id && session.user) {
+                session.user.id = token.id as string;
+                (session.user as any).emailVerified = token.emailVerified;
             }
             return session;
         },

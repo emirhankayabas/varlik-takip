@@ -4,20 +4,26 @@ import Asset from "@/lib/models/Asset";
 import Bank from "@/lib/models/Bank";
 import { auth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: Request) {
     const session = await auth();
     if (!session?.user?.id) {
         return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const market = searchParams.get("market");
+
     try {
         await dbConnect();
 
-        // Sadece SELL tipi işlemleri getir (Satışlar)
-        const sales = await Asset.find({
+        const query: any = {
             userId: session.user.id,
             type: "SELL"
-        })
+        };
+        if (market) query.market = market;
+
+        // Sadece SELL tipi işlemleri getir (Satışlar)
+        const sales = await Asset.find(query)
             .populate("bankId")
             .sort({ buyDate: -1 }); // Satış tarihine göre sırala
 

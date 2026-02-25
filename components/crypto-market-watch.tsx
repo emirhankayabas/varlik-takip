@@ -373,7 +373,7 @@ export function CryptoMarketWatch() {
                         />
                       ))
                     ) : (
-                      <div className="flex h-32 items-center justify-center text-muted-foreground italic text-sm">
+                      <div className="flex h-32 items-center justify-center text-muted-foreground text-sm">
                         Hiçbir sonuç bulunamadı.
                       </div>
                     )}
@@ -427,13 +427,13 @@ export function CryptoMarketWatch() {
               const isUp = (stats?.change || 0) >= 0;
               const rangePercent = stats
                 ? Math.min(
+                  100,
+                  Math.max(
+                    0,
+                    ((stats.price - stats.low) / (stats.high - stats.low)) *
                     100,
-                    Math.max(
-                      0,
-                      ((stats.price - stats.low) / (stats.high - stats.low)) *
-                        100,
-                    ),
-                  )
+                  ),
+                )
                 : 0;
 
               return (
@@ -453,7 +453,7 @@ export function CryptoMarketWatch() {
                         />
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-bold text-sm tracking-tight italic">
+                        <span className="font-bold text-sm tracking-tight">
                           {coin.symbol}
                         </span>
                         <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-tighter">

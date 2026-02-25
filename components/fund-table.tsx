@@ -100,7 +100,7 @@ export function FundTable({ funds, onRefresh }: FundTableProps) {
     }
 
     return (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950/30 overflow-hidden backdrop-blur-sm shadow-2xl animate-in fade-in slide-in-from-top-4 duration-1000">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950/30 overflow-hidden backdrop-blur-sm shadow-2xl">
             <Table>
                 <TableHeader>
                     <TableRow>

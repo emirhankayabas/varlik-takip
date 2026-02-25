@@ -125,7 +125,7 @@ export function IpoList({ offerings, onRefresh }: IpoListProps) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950/30 overflow-hidden backdrop-blur-sm shadow-2xl animate-in fade-in slide-in-from-top-4 duration-1000">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-950/30 overflow-hidden backdrop-blur-sm shadow-2xl">
         <Table>
           <TableHeader>
             <TableRow>
@@ -145,16 +145,16 @@ export function IpoList({ offerings, onRefresh }: IpoListProps) {
               const refund =
                 ipo.status !== "PENDING"
                   ? (ipo.requestedAmount - (ipo.allocatedAmount || 0)) *
-                    ipo.price
+                  ipo.price
                   : 0;
 
               const diffDays =
                 ipo.status === "ALLOCATED" && !ipo.listingDate
                   ? Math.floor(
-                      (new Date().getTime() -
-                        new Date(ipo.updatedAt).getTime()) /
-                        (1000 * 3600 * 24),
-                    )
+                    (new Date().getTime() -
+                      new Date(ipo.updatedAt).getTime()) /
+                    (1000 * 3600 * 24),
+                  )
                   : 0;
 
               return (

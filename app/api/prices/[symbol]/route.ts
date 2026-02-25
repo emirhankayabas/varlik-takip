@@ -6,7 +6,10 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ symbol: string }> }
 ) {
-    const { symbol } = await params;
+    const { symbol: rawSymbol } = await params;
+    const { searchParams } = new URL(request.url);
+    const forceRefresh = searchParams.get("refresh") === "true";
+    const symbol = rawSymbol?.toUpperCase();
 
     if (!symbol) {
         return NextResponse.json({ error: "Sembol gerekli" }, { status: 400 });
@@ -15,46 +18,51 @@ export async function GET(
     try {
         await dbConnect();
 
-        // 1. Önce Cache'e (MongoDB) bak
-        const cachedData = await PriceCache.findOne({ symbol });
-        if (cachedData) {
-            const now = new Date();
-            const createdAt = new Date(cachedData.createdAt);
-            const diffInMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+        // 1. Önce Cache'e (MongoDB) bak (eğer forceRefresh değilse)
+        if (!forceRefresh) {
+            const cachedData = await PriceCache.findOne({ symbol });
+            if (cachedData) {
+                const now = new Date();
+                const createdAt = new Date(cachedData.createdAt);
+                const diffInMinutes = (now.getTime() - createdAt.getTime()) / (1000 * 60);
 
-            // Eğer 5 dakikadan kısaysa cache'den dön
-            if (diffInMinutes < 5) {
-                console.log(`Cache Hit: ${symbol} (${Math.round(diffInMinutes * 60)}s old)`);
-                return NextResponse.json({
-                    symbol: cachedData.symbol,
-                    price: cachedData.price,
-                    currency: cachedData.currency,
-                    previousClose: cachedData.previousClose,
-                    change: cachedData.change,
-                    changePercent: cachedData.changePercent,
-                    isCached: true
-                }, {
-                    headers: {
-                        "Cache-Control": "no-store, max-age=0"
-                    }
-                });
-            } else {
-                console.log(`Cache Stale: ${symbol}. Re-fetching...`);
+                // Eğer 5 dakikadan kısaysa cache'den dön
+                if (diffInMinutes < 5) {
+                    console.log(`Cache Hit: ${symbol} (${Math.round(diffInMinutes * 60)}s old)`);
+                    return NextResponse.json({
+                        symbol: cachedData.symbol,
+                        price: cachedData.price,
+                        currency: cachedData.currency,
+                        previousClose: cachedData.previousClose,
+                        change: cachedData.change,
+                        changePercent: cachedData.changePercent,
+                        isCached: true,
+                        cachedAt: cachedData.createdAt
+                    }, {
+                        headers: {
+                            "Cache-Control": "no-store, max-age=0"
+                        }
+                    });
+                } else {
+                    console.log(`Cache Stale: ${symbol}. Re-fetching...`);
+                }
             }
+        } else {
+            console.log(`Force Refresh: ${symbol}. Bypassing cache...`);
         }
 
-        console.log(`Cache Miss: ${symbol}. Fetching from API...`);
+        console.log(`Fetching from Yahoo Finance: ${symbol}...`);
 
-        // 2. Cache'de yoksa Yahoo Finance'den çek
+        // 2. Yahoo Finance'den çek (Tahmin edilenden daha taze veri için cache: "no-store")
         const response = await fetch(
             `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`,
             {
-                next: { revalidate: 300 }, // Next.js seviyesinde de 5 dk tut
+                cache: "no-store", // Next.js fetch cache'ini tamamen kapatıyoruz
             }
         );
 
         if (!response.ok) {
-            throw new Error("Yahoo Finance yanıt vermedi");
+            throw new Error(`Yahoo Finance yanıt vermedi: ${response.status}`);
         }
 
         const data = await response.json();
@@ -78,7 +86,6 @@ export async function GET(
         };
 
         // 3. Çekilen veriyi Cache'e (MongoDB) kaydet
-        // (Vercel'de arka planda sessizce yapabiliriz ama burada beklemek daha garanti)
         await PriceCache.findOneAndUpdate(
             { symbol },
             { ...responseData, createdAt: new Date() },
@@ -86,7 +93,7 @@ export async function GET(
         );
 
         return NextResponse.json(
-            { ...responseData, isCached: false },
+            { ...responseData, isCached: false, cachedAt: new Date() },
             {
                 headers: {
                     "Cache-Control": "no-store, max-age=0"

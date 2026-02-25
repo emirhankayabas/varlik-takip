@@ -4,15 +4,21 @@ import Asset from "@/lib/models/Asset";
 import Bank from "@/lib/models/Bank";
 import { auth } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: Request) {
     const session = await auth();
     if (!session?.user?.id) {
         return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const market = searchParams.get("market");
+
     try {
         await dbConnect();
-        const assets = await Asset.find({ userId: session.user.id, type: "BUY" })
+        const query: any = { userId: session.user.id, type: "BUY" };
+        if (market) query.market = market;
+
+        const assets = await Asset.find(query)
             .populate("bankId")
             .sort({ createdAt: -1 });
         return NextResponse.json(assets);
@@ -35,16 +41,18 @@ export async function POST(request: Request) {
         const body = await request.json();
         await dbConnect();
 
-        // Sembolün sonuna .IS ekle (eğer borsa değilse ve kullanıcı eklememişse)
-        // Bu basit bir varsayımdır, kullanıcı THYAO yazarsa THYAO.IS olur.
         let symbol = body.symbol.toUpperCase();
-        if (!symbol.includes(".")) {
+        const market = body.market || "BIST";
+
+        // Sembolün sonuna .IS ekle (Eğer BIST ise ve kullanıcı eklememişse)
+        if (market === "BIST" && !symbol.includes(".")) {
             symbol = `${symbol}.IS`;
         }
 
         const newAsset = await Asset.create({
             ...body,
             symbol,
+            market,
             userId: session.user.id,
         });
 

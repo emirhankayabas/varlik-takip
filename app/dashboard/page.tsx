@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Plus, Wallet, TrendingUp, Loader2, HandCoins, ChevronDown } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -13,6 +14,10 @@ import { IpoList } from "@/components/ipo-list";
 import { FundForm } from "@/components/fund-form";
 import { FundTable } from "@/components/fund-table";
 import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Landmark, Globe, PieChart, Calendar as CalendarIconUI } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { isTodayInIpoDate } from "@/lib/ipo-utils";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -24,15 +29,20 @@ export default function DashboardPage() {
   const [funds, setFunds] = useState([]);
   const [publicOfferings, setPublicOfferings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("bist");
+  const [usdRate, setUsdRate] = useState(1);
   const [totals, setTotals] = useState({
     totalVal: 0,
     totalProfit: 0,
     realizedProfit: 0,
-    stockVal: 0,
+    bistVal: 0,
+    usVal: 0,
     fundVal: 0,
-    stockProfit: 0,
+    bistProfit: 0,
+    usProfit: 0,
     fundProfit: 0,
-    stockRealizedProfit: 0,
+    bistRealizedProfit: 0,
+    usRealizedProfit: 0,
     fundRealizedProfit: 0
   });
 
@@ -49,11 +59,13 @@ export default function DashboardPage() {
 
       setAssets(assetData);
       setTotals(prev => {
-        const stockRealized = salesData.totalRealizedProfit || 0;
+        const bistRealized = salesData.sales.filter((s: any) => s.market === "BIST").reduce((sum: number, s: any) => sum + (s.realizedProfit || 0), 0);
+        const usRealized = salesData.sales.filter((s: any) => s.market === "US").reduce((sum: number, s: any) => sum + (s.realizedProfit || 0), 0);
         return {
           ...prev,
-          stockRealizedProfit: stockRealized,
-          realizedProfit: stockRealized + prev.fundRealizedProfit
+          bistRealizedProfit: bistRealized,
+          usRealizedProfit: usRealized,
+          realizedProfit: bistRealized + (usRealized * usdRate) + prev.fundRealizedProfit
         };
       });
     } catch (error) {
@@ -92,7 +104,7 @@ export default function DashboardPage() {
         return {
           ...prev,
           fundRealizedProfit: fundRealized,
-          realizedProfit: prev.stockRealizedProfit + fundRealized
+          realizedProfit: prev.bistRealizedProfit + (prev.usRealizedProfit * usdRate) + fundRealized
         };
       });
     } catch (error) {
@@ -129,7 +141,15 @@ export default function DashboardPage() {
         console.error("Halkarz verisi çekilemedi:", error);
       }
     };
+    const fetchUsdRate = async () => {
+      try {
+        const res = await fetch("/api/prices/USDTRY=X");
+        const data = await res.json();
+        if (data.price) setUsdRate(data.price);
+      } catch (e) { }
+    };
     fetchAgendaIpos();
+    fetchUsdRate();
   }, []);
 
   useEffect(() => {
@@ -165,9 +185,24 @@ export default function DashboardPage() {
         })
       );
 
-      let stockVal = 0;
+      // 3.5 ABD Borsası için USD/TRY kurunu çek
+      let currentUsdRate = usdRate;
+      try {
+        const res = await fetch(`/api/prices/USDTRY=X`);
+        const p = await res.json();
+        if (p.price) {
+          currentUsdRate = p.price;
+          setUsdRate(p.price);
+        }
+      } catch (e) {
+        console.error("Dolar kuru çekilemedi");
+      }
+
+      let bistVal = 0;
+      let usVal = 0;
       let fundVal = 0;
-      let stockProfit = 0;
+      let bistProfit = 0;
+      let usProfit = 0;
       let fundProfit = 0;
 
       // 4. Toplamları hesapla (Hisseler)
@@ -176,10 +211,19 @@ export default function DashboardPage() {
         if (currentPrice !== undefined) {
           const itemVal = asset.amount * currentPrice;
           const itemProfit = itemVal - asset.amount * asset.buyPrice;
-          val += itemVal;
-          stockVal += itemVal;
-          profit += itemProfit;
-          stockProfit += itemProfit;
+
+          if (asset.market === "US") {
+            usVal += itemVal;
+            usProfit += itemProfit;
+            // USD -> TRY çevirisi yaparak toplama ekle
+            val += itemVal * currentUsdRate;
+            profit += itemProfit * currentUsdRate;
+          } else {
+            bistVal += itemVal;
+            bistProfit += itemProfit;
+            val += itemVal;
+            profit += itemProfit;
+          }
         }
       }
 
@@ -200,9 +244,11 @@ export default function DashboardPage() {
         ...prev,
         totalVal: val,
         totalProfit: profit,
-        stockVal,
+        bistVal,
+        usVal,
         fundVal,
-        stockProfit,
+        bistProfit,
+        usProfit,
         fundProfit
       }));
     };
@@ -214,11 +260,14 @@ export default function DashboardPage() {
         ...prev,
         totalVal: 0,
         totalProfit: 0,
-        stockVal: 0,
+        bistVal: 0,
+        usVal: 0,
         fundVal: 0,
-        stockProfit: 0,
+        bistProfit: 0,
+        usProfit: 0,
         fundProfit: 0,
-        stockRealizedProfit: 0,
+        bistRealizedProfit: 0,
+        usRealizedProfit: 0,
         fundRealizedProfit: 0
       }));
     }
@@ -227,12 +276,12 @@ export default function DashboardPage() {
   if (!mounted) return null;
 
   return (
-    <main className="container mx-auto px-6 py-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <main className="container mx-auto px-6 py-10">
       {/* Özet Kartları */}
       {/* Özet Kartları */}
       {/* Özet Kartları */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <Card className="group relative overflow-hidden">
+        <Card className="group relative overflow-hidden gap-y-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Toplam Varlık</CardTitle>
             <Wallet className="w-4 h-4 text-zinc-500" />
@@ -241,20 +290,24 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold tracking-tight">
               ₺{totals.totalVal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
             </div>
-            <div className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-zinc-500">Hisse Toplamı</span>
-                <span className="font-semibold text-zinc-300">₺{totals.stockVal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+            <div className="mt-4 border-t border-zinc-800 pt-4">
+              <div className="flex justify-between items-center text-[12px] py-0.5">
+                <span className="text-white/70">BIST Hisseleri</span>
+                <span className="font-semibold text-white">₺{totals.bistVal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-zinc-500">Fon Toplamı</span>
-                <span className="font-semibold text-zinc-300">₺{totals.fundVal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+              <div className="flex justify-between items-center text-[12px] py-0.5">
+                <span className="text-white/70">ABD Hisseleri</span>
+                <span className="font-semibold text-white">${totals.usVal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="flex justify-between items-center text-[12px] py-0.5">
+                <span className="text-white/70">Yatırım Fonları</span>
+                <span className="font-semibold text-white">₺{totals.fundVal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="group relative">
+        <Card className="group relative gap-y-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Toplam Kar / Zarar</CardTitle>
             <TrendingUp className="w-4 h-4 text-zinc-500" />
@@ -266,15 +319,21 @@ export default function DashboardPage() {
             )}>
               {totals.totalProfit >= 0 ? "+" : ""}₺{totals.totalProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
             </div>
-            <div className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-zinc-500">Hisse Kar/Zarar</span>
-                <span className={cn("font-semibold", totals.stockProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
-                  {totals.stockProfit >= 0 ? "+" : ""}₺{totals.stockProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+            <div className="mt-4 border-t border-zinc-800 pt-4">
+              <div className="flex justify-between items-center text-[12px] py-0.5">
+                <span className="text-white/70">BIST Kar/Zarar</span>
+                <span className={cn("font-semibold", totals.bistProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
+                  {totals.bistProfit >= 0 ? "+" : ""}₺{totals.bistProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-zinc-500">Fon Kar/Zarar</span>
+              <div className="flex justify-between items-center text-[12px] py-0.5">
+                <span className="text-white/70">ABD Kar/Zarar</span>
+                <span className={cn("font-semibold", totals.usProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
+                  {totals.usProfit >= 0 ? "+" : ""}${totals.usProfit.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-[12px] py-0.5">
+                <span className="text-white/70">Fon Kar/Zarar</span>
                 <span className={cn("font-semibold", totals.fundProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
                   {totals.fundProfit >= 0 ? "+" : ""}₺{totals.fundProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
                 </span>
@@ -283,7 +342,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="group relative overflow-hidden">
+        <Card className="group relative overflow-hidden gap-y-0">
           <Link href="/dashboard/sales" className="absolute inset-0 z-10" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Toplam Gerçekleşen Kar</CardTitle>
@@ -296,15 +355,21 @@ export default function DashboardPage() {
             )}>
               {totals.realizedProfit >= 0 ? "+" : ""}₺{totals.realizedProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
             </div>
-            <div className="mt-4 space-y-2 border-t border-zinc-800 pt-4">
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-zinc-500">Hisse Gerçekleşen Kar</span>
-                <span className={cn("font-semibold", totals.stockRealizedProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
-                  {totals.stockRealizedProfit >= 0 ? "+" : ""}₺{totals.stockRealizedProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+            <div className="mt-4 border-t border-zinc-800 pt-4">
+              <div className="flex justify-between items-center text-[12px] py-0.5">
+                <span className="text-white/70">BIST Gerçekleşen Kar</span>
+                <span className={cn("font-semibold", totals.bistRealizedProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
+                  {totals.bistRealizedProfit >= 0 ? "+" : ""}₺{totals.bistRealizedProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-zinc-500">Fon Gerçekleşen Kar</span>
+              <div className="flex justify-between items-center text-[12px] py-0.5">
+                <span className="text-white/70">ABD Gerçekleşen Kar</span>
+                <span className={cn("font-semibold", totals.usRealizedProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
+                  {totals.usRealizedProfit >= 0 ? "+" : ""}${totals.usRealizedProfit.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-[12px] py-0.5">
+                <span className="text-white/70">Fon Gerçekleşen Kar</span>
                 <span className={cn("font-semibold", totals.fundRealizedProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
                   {totals.fundRealizedProfit >= 0 ? "+" : ""}₺{totals.fundRealizedProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
                 </span>
@@ -314,142 +379,217 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Agenda IPOs */}
-      {agendaIpos.length > 0 && (
-        <div className="mb-12 animate-in fade-in slide-in-from-top-4 duration-1000">
-          <div className="flex items-center gap-2 mb-4">
-            <h2 className="text-2xl font-semibold tracking-tight">Yeni Halka Arzlar</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {agendaIpos.map((ipo, idx) => {
-              const isParticipated = publicOfferings.some((p: any) => {
-                const pSymbol = p.symbol.split(".")[0].toUpperCase();
-                const iSymbol = ipo.symbol.toUpperCase();
-                return pSymbol === iSymbol;
-              });
-
-              return (
-                <Card key={idx} className={cn(isParticipated && "border-emerald-500/50 bg-emerald-500/5")}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-x-1">
-                        <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">
-                          {ipo.symbol || "IPO"}
-                        </span>
-                        <TrendingUp className="w-3.5 h-3.5 text-zinc-400" />
-                      </div>
-                      {isParticipated && (
-                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">
-                          KATILDINIZ
-                        </span>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <CardTitle className="line-clamp-1">
-                      {ipo.name}
-                    </CardTitle>
-                    <p className="text-xs mt-2 text-zinc-400">
-                      {ipo.date}
-                    </p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+      {/* Tabs System */}
+      <Tabs defaultValue="bist" className="space-y-8" onValueChange={(val) => setActiveTab(val)}>
+        <div className="flex items-center justify-between">
+          <TabsList className="bg-zinc-900/50 p-1 border border-zinc-800/50 rounded-xl">
+            <TabsTrigger value="bist" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2">
+              <Landmark className="w-3.5 h-3.5" />
+              BIST Hisseleri
+            </TabsTrigger>
+            <TabsTrigger value="us" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2">
+              <Globe className="w-3.5 h-3.5" />
+              ABD Hisseleri
+            </TabsTrigger>
+            <TabsTrigger value="funds" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2">
+              <PieChart className="w-3.5 h-3.5" />
+              Yatırım Fonları
+            </TabsTrigger>
+            <TabsTrigger value="ipo" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2">
+              <CalendarIconUI className="w-3.5 h-3.5" />
+              Halka Arzlar
+            </TabsTrigger>
+          </TabsList>
         </div>
-      )}
 
-      {/* Portföy Detayı */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 mt-12">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Portföy Detayı
-          </h2>
-          <p className="text-zinc-500 text-sm mt-1">
-            İşlemlerinizi buradan takip edebilir ve yönetebilirsiniz.
-          </p>
-        </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="w-4 h-4" />
-          Yeni Hisse Ekle
-        </Button>
-      </div>
-
-      {loading ? (
-        <div className="flex flex-col items-center justify-center gap-4 bg-zinc-900/20 rounded-md p-12">
-          <div className="relative">
-            <Loader2 className="h-10 w-10 animate-spin text-white opacity-20" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="h-1.5 w-1.5 bg-white rounded-full" />
+        <TabsContent value="bist" className="space-y-6 outline-none">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-white">Portföy Detayı (BIST)</h2>
+              <p className="text-white/60 text-sm mt-1">Borsa İstanbul hisselerinizi buradan takip edin.</p>
             </div>
+            <Button onClick={() => setIsFormOpen(true)}>
+              <Plus className="w-4 h-4" />
+              Yeni Hisse Ekle
+            </Button>
           </div>
-          <p className="text-zinc-500 text-xs font-medium uppercase tracking-[0.2em]">
-            Varlıklarınız İşleniyor
-          </p>
-        </div>
-      ) : (
-        <div className="animate-in fade-in slide-in-from-top-4 duration-1000">
-          <AssetTable assets={assets} onRefresh={() => fetchAssetsOnly(false)} />
-        </div>
-      )}
+          {loading ? (
+            <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/10 rounded-xl border border-zinc-900">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key="bist"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <AssetTable assets={assets} market="BIST" onRefresh={() => fetchAssetsOnly(false)} />
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </TabsContent>
 
-      {/* Fon Takibi */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 mt-16">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Fon Takibi
-          </h2>
-          <p className="text-zinc-500 text-sm mt-1">
-            Yatırım fonlarınızı buradan takip edebilir ve yönetebilirsiniz.
-          </p>
-        </div>
-        <Button onClick={() => setIsFundFormOpen(true)}>
-          <Plus className="w-4 h-4" />
-          Yeni Fon Ekle
-        </Button>
-      </div>
+        <TabsContent value="us" className="space-y-6 outline-none">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-white">Portföy Detayı (ABD)</h2>
+              <p className="text-white/60 text-sm mt-1">Amerikan borsalarındaki yatırımlarınızı izleyin.</p>
+            </div>
+            <Button onClick={() => setIsFormOpen(true)}>
+              <Plus className="w-4 h-4" />
+              Yeni Hisse Ekle
+            </Button>
+          </div>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/10 rounded-xl border border-zinc-900">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key="us"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <AssetTable assets={assets} market="US" onRefresh={() => fetchAssetsOnly(false)} />
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </TabsContent>
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/10 rounded-xl border border-zinc-900">
-          <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
-        </div>
-      ) : (
-        <div className="animate-in fade-in slide-in-from-top-4 duration-1000">
-          <FundTable funds={funds} onRefresh={() => fetchFundsOnly(false)} />
-        </div>
-      )}
+        <TabsContent value="funds" className="space-y-6 outline-none">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold tracking-tight text-white">Fon Takibi</h2>
+              <p className="text-white/60 text-sm mt-1">Yatırım fonlarınızı buradan takip edebilir ve yönetebilirsiniz.</p>
+            </div>
+            <Button onClick={() => setIsFundFormOpen(true)}>
+              <Plus className="w-4 h-4" />
+              Yeni Fon Ekle
+            </Button>
+          </div>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/10 rounded-xl border border-zinc-900">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key="funds"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <FundTable funds={funds} onRefresh={() => fetchFundsOnly(false)} />
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </TabsContent>
 
-      {/* Halka Arz Takibi */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 mt-16">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Halka Arz Takibi
-          </h2>
-          <p className="text-zinc-500 text-sm mt-1">
-            Halk arz taleplerinizi ve dağıtım sonuçlarını izleyin.
-          </p>
-        </div>
-        <Button onClick={() => setIsIpoFormOpen(true)}>
-          <Plus className="w-4 h-4" />
-          Yeni Halka Arz Ekle
-        </Button>
-      </div>
+        <TabsContent value="ipo" className="space-y-12 outline-none">
+          {/* Agenda IPOs */}
+          {agendaIpos.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <h2 className="text-xl font-semibold tracking-tight text-white">Yeni Halka Arzlar</h2>
+                <Badge variant="outline" className="text-[10px] font-bold border-zinc-800 text-zinc-500">GÜNCEL</Badge>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {agendaIpos.map((ipo, idx) => {
+                  const isParticipated = publicOfferings.some((p: any) => {
+                    const pSymbol = p.symbol.split(".")[0].toUpperCase();
+                    const iSymbol = ipo.symbol.toUpperCase();
+                    return pSymbol === iSymbol;
+                  });
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/10 rounded-xl border border-zinc-900">
-          <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
-        </div>
-      ) : (
-        <div className="animate-in fade-in slide-in-from-top-4 duration-1000">
-          <IpoList offerings={publicOfferings} onRefresh={() => fetchIposOnly(false)} />
-        </div>
-      )}
+                  const isApplicationToday = isTodayInIpoDate(ipo.date);
+
+                  return (
+                    <Card key={idx} className={cn("group transition-all duration-300 hover:border-zinc-700 gap-y-1", isParticipated && "border-emerald-500/50 bg-emerald-500/5 hover:border-emerald-500/70", !isParticipated && isApplicationToday && "border-amber-500/50 bg-amber-500/5")}>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-x-1.5">
+                            <span className="text-zinc-500 uppercase font-bold text-xs tracking-tight">
+                              {ipo.symbol || "IPO"}
+                            </span>
+                            <TrendingUp className="w-3 h-3 text-zinc-500" />
+                          </div>
+                          <div className="flex gap-1.5">
+                            {!isParticipated && isApplicationToday && (
+                              <Badge variant="outline" className="text-amber-400 bg-amber-400/10 animate-pulse border-amber-400/30">
+                                Talep Girin
+                              </Badge>
+                            )}
+                            {isParticipated && (
+                              <Badge variant="outline" className="text-emerald-400 bg-emerald-400/10">
+                                Katıldınız
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <CardTitle>
+                          {ipo.name}
+                        </CardTitle>
+                        <div className="flex items-center gap-1 mt-2 text-zinc-500">
+                          <CalendarIconUI className="w-3 h-3" />
+                          <p className="text-[12px] font-medium tracking-tight uppercase">
+                            {ipo.date}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Halka Arz Takibi */}
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold tracking-tight text-white">Halka Arz Takibi</h2>
+                <p className="text-white/60 text-sm mt-1">Halk arz taleplerinizi ve dağıtım sonuçlarını izleyin.</p>
+              </div>
+              <Button onClick={() => setIsIpoFormOpen(true)}>
+                <Plus className="w-4 h-4" />
+                Yeni Halka Arz Ekle
+              </Button>
+            </div>
+            {loading ? (
+              <div className="flex flex-col items-center justify-center p-12 bg-zinc-900/10 rounded-xl border border-zinc-900">
+                <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+              </div>
+            ) : (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key="ipo"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <IpoList offerings={publicOfferings} onRefresh={() => fetchIposOnly(false)} />
+                </motion.div>
+              </AnimatePresence>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Ekleme Formları */}
       <AssetForm
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
+        initialMarket={activeTab === "us" ? "US" : "BIST"}
         onSuccess={() => fetchAssetsOnly(false)}
       />
       <IpoForm
