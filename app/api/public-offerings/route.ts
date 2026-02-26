@@ -9,12 +9,16 @@ async function checkAndProcessIPOs(userId: string) {
     const now = new Date();
 
     // Türkiye saati ile 10:00 kontrolü (Borsa açılışı)
-    // now nesnesi sistem saati ise (UTC+3), hours 10 olmalı.
-    const isAfterOpening = now.getHours() >= 10;
+    // Türkiye (GMT+3) 10:00, UTC 07:00'ye tekabül eder.
+    const isAfterOpening = now.getUTCHours() >= 7;
 
     if (!isAfterOpening) return;
 
     // Statusu ALLOCATED olan ve listingDate'i bugün veya geçmiş olanları bul
+    // listingDate'in sadece gününü karşılaştırmak için UTC başlangıcına çekelim
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
     const ripeIPOs = await PublicOffering.find({
         userId,
         status: "ALLOCATED",
@@ -36,7 +40,8 @@ async function checkAndProcessIPOs(userId: string) {
             buyPrice: ipo.price,
             buyDate: ipo.listingDate || now,
             bankId: ipo.bankId,
-            type: "BUY"
+            type: "BUY",
+            market: "BIST"
         });
 
         // IPO durumunu güncelle

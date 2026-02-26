@@ -118,9 +118,11 @@ export default function DashboardPage() {
 
   const fetchEverything = useCallback(async () => {
     setLoading(true);
+    // Önce Halka Arzlar (Aktarımı tetikler)
+    await fetchIposOnly(false);
+    // Sonra Varlıklar ve Fonlar (Yeni verileri görür)
     await Promise.all([
       fetchAssetsOnly(false),
-      fetchIposOnly(false),
       fetchFundsOnly(false)
     ]);
     setLoading(false);
