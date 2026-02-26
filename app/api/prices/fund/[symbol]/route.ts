@@ -41,7 +41,16 @@ export async function GET(
                         changePercent: cachedData.changePercent,
                         name: cachedData.name || symbol,
                         isCached: true,
-                        cachedAt: cachedData.createdAt
+                        cachedAt: cachedData.createdAt,
+                        cachedAtFormatted: new Date(cachedData.createdAt).toLocaleString("tr-TR", {
+                            timeZone: "Europe/Istanbul",
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                        }).replace(",", "")
                     });
                 }
             }
@@ -74,7 +83,20 @@ export async function GET(
             { upsert: true }
         );
 
-        return NextResponse.json({ ...responseData, isCached: false, cachedAt: new Date() });
+        return NextResponse.json({
+            ...responseData,
+            isCached: false,
+            cachedAt: new Date(),
+            cachedAtFormatted: new Date().toLocaleString("tr-TR", {
+                timeZone: "Europe/Istanbul",
+                day: "2-digit",
+                month: "2-digit",
+                year: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+            }).replace(",", "")
+        });
     } catch (error) {
         console.error("Fon fiyat çekme hatası:", error);
         return NextResponse.json(

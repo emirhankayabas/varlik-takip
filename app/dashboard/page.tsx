@@ -33,6 +33,8 @@ export default function DashboardPage() {
   const [usdRate, setUsdRate] = useState(1);
   const [priceMap, setPriceMap] = useState<Record<string, { price: number; changePercent?: number }>>({});
   const [fundPriceMap, setFundPriceMap] = useState<Record<string, { price: number; changePercent?: number; change?: number; name?: string }>>({});
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [totals, setTotals] = useState({
     totalVal: 0,
     totalProfit: 0,
@@ -145,154 +147,145 @@ export default function DashboardPage() {
         console.error("Halkarz verisi çekilemedi:", error);
       }
     };
-    const fetchUsdRate = async () => {
-      try {
-        const res = await fetch("/api/prices/USDTRY=X");
-        const data = await res.json();
-        if (data.price) setUsdRate(data.price);
-      } catch (e) { }
-    };
     fetchAgendaIpos();
-    fetchUsdRate();
   }, []);
 
-  useEffect(() => {
-    const calculateTotals = async () => {
-      let val = 0;
-      let profit = 0;
+  const calculateTotals = useCallback(async (forceRefresh = false) => {
+    if (assets.length === 0 && funds.length === 0) {
+      setTotals(prev => ({
+        ...prev,
+        totalVal: 0, totalProfit: 0,
+        bistVal: 0, usVal: 0, fundVal: 0,
+        bistProfit: 0, usProfit: 0, fundProfit: 0,
+        bistRealizedProfit: 0, usRealizedProfit: 0, fundRealizedProfit: 0
+      }));
+      return;
+    }
 
-      // 1. Benzersiz sembolleri ayıkla
-      const uniqueSymbols = Array.from(new Set(assets.map((a: any) => a.symbol)));
+    if (forceRefresh) setIsRefreshing(true);
+    const latestDates: Date[] = [];
+    let currentUsdRate = usdRate;
 
-      // 2. Sembol bazlı güncel fiyatları tek seferde çek
-      const currentPriceMap: Record<string, { price: number; changePercent?: number }> = {};
-      await Promise.all(
-        uniqueSymbols.map(async (symbol) => {
+    const uniqueSymbols = Array.from(new Set(assets.map((a: any) => a.symbol)));
+    const uniqueFundSymbols = Array.from(new Set(funds.map((f: any) => f.symbol)));
+
+    const currentPriceMap: Record<string, { price: number; changePercent?: number }> = {};
+    const currentFundPriceMap: Record<string, { price: number; changePercent?: number; change?: number; name?: string }> = {};
+
+    try {
+      await Promise.all([
+        ...uniqueSymbols.map(async (symbol) => {
           try {
-            const res = await fetch(`/api/prices/${symbol}`);
+            const res = await fetch(`/api/prices/${symbol}${forceRefresh ? "?refresh=true" : ""}`);
             const p = await res.json();
-            currentPriceMap[symbol] = {
-              price: p.price,
-              changePercent: p.changePercent
-            };
+            currentPriceMap[symbol] = { price: p.price, changePercent: p.changePercent };
+            if (p.cachedAt) latestDates.push(new Date(p.cachedAt));
           } catch (e) { }
-        })
-      );
-
-      // 3. Fonlar için sembol bazlı güncel fiyatları çek
-      const uniqueFundSymbols = Array.from(new Set(funds.map((f: any) => f.symbol)));
-      const currentFundPriceMap: Record<string, { price: number; changePercent?: number; change?: number; name?: string }> = {};
-      await Promise.all(
-        uniqueFundSymbols.map(async (symbol) => {
+        }),
+        ...uniqueFundSymbols.map(async (symbol) => {
           try {
-            const res = await fetch(`/api/prices/fund/${symbol}`);
+            const res = await fetch(`/api/prices/fund/${symbol}${forceRefresh ? "?refresh=true" : ""}`);
             const p = await res.json();
             currentFundPriceMap[symbol] = {
-              price: p.price,
-              changePercent: p.changePercent,
-              change: p.change,
-              name: p.name
+              price: p.price, changePercent: p.changePercent,
+              change: p.change, name: p.name
             };
+            if (p.cachedAt) latestDates.push(new Date(p.cachedAt));
           } catch (e) { }
-        })
-      );
+        }),
+        (async () => {
+          try {
+            const res = await fetch(`/api/prices/USDTRY=X${forceRefresh ? "?refresh=true" : ""}`);
+            const p = await res.json();
+            if (p.price) {
+              currentUsdRate = p.price;
+              setUsdRate(p.price);
+            }
+            if (p.cachedAt) latestDates.push(new Date(p.cachedAt));
+          } catch (e) { }
+        })()
+      ]);
+    } catch (e) {
+      console.error("Fiyat güncelleme hatası");
+    }
 
-      // 3.5 ABD Borsası için USD/TRY kurunu çek
-      let currentUsdRate = usdRate;
-      try {
-        const res = await fetch(`/api/prices/USDTRY=X`);
-        const p = await res.json();
-        if (p.price) {
-          currentUsdRate = p.price;
-          setUsdRate(p.price);
-        }
-      } catch (e) {
-        console.error("Dolar kuru çekilemedi");
-      }
+    let val = 0, profit = 0, bistVal = 0, usVal = 0, fundVal = 0;
+    let bistProfit = 0, usProfit = 0, fundProfit = 0;
 
-      let bistVal = 0;
-      let usVal = 0;
-      let fundVal = 0;
-      let bistProfit = 0;
-      let usProfit = 0;
-      let fundProfit = 0;
-
-      // 4. Toplamları hesapla (Hisseler)
-      for (const asset of assets as any[]) {
-        const priceData = currentPriceMap[asset.symbol];
-        if (priceData !== undefined) {
-          const currentPrice = priceData.price;
-          const itemVal = asset.amount * currentPrice;
-          const itemProfit = itemVal - asset.amount * asset.buyPrice;
-
-          if (asset.market === "US") {
-            usVal += itemVal;
-            usProfit += itemProfit;
-            // USD -> TRY çevirisi yaparak toplama ekle
-            val += itemVal * currentUsdRate;
-            profit += itemProfit * currentUsdRate;
-          } else {
-            bistVal += itemVal;
-            bistProfit += itemProfit;
-            val += itemVal;
-            profit += itemProfit;
-          }
+    for (const asset of assets as any[]) {
+      const priceData = currentPriceMap[asset.symbol];
+      if (priceData) {
+        const itemVal = asset.amount * priceData.price;
+        const itemProfit = itemVal - asset.amount * asset.buyPrice;
+        if (asset.market === "US") {
+          usVal += itemVal; usProfit += itemProfit;
+          val += itemVal * currentUsdRate; profit += itemProfit * currentUsdRate;
+        } else {
+          bistVal += itemVal; bistProfit += itemProfit;
+          val += itemVal; profit += itemProfit;
         }
       }
+    }
 
-      // 5. Toplamları hesapla (Fonlar)
-      for (const fund of funds as any[]) {
-        const priceData = currentFundPriceMap[fund.symbol];
-        if (priceData !== undefined) {
-          const currentPrice = priceData.price;
-          const itemVal = fund.amount * currentPrice;
-          const itemProfit = itemVal - fund.amount * fund.buyPrice;
-          val += itemVal;
-          fundVal += itemVal;
-          profit += itemProfit;
-          fundProfit += itemProfit;
-        }
+    for (const fund of funds as any[]) {
+      const priceData = currentFundPriceMap[fund.symbol];
+      if (priceData) {
+        const itemVal = fund.amount * priceData.price;
+        const itemProfit = itemVal - fund.amount * fund.buyPrice;
+        val += itemVal; fundVal += itemVal;
+        profit += itemProfit; fundProfit += itemProfit;
       }
+    }
 
-      setPriceMap(currentPriceMap);
-      setFundPriceMap(currentFundPriceMap);
-      setTotals(prev => ({
-        ...prev,
-        totalVal: val,
-        totalProfit: profit,
-        bistVal,
-        usVal,
-        fundVal,
-        bistProfit,
-        usProfit,
-        fundProfit
-      }));
-    };
+    setPriceMap(currentPriceMap);
+    setFundPriceMap(currentFundPriceMap);
+    if (latestDates.length > 0) {
+      const newLastUpdated = new Date(Math.max(...latestDates.map(d => d.getTime())));
+      setLastUpdated(newLastUpdated);
 
-    if (assets.length > 0 || funds.length > 0) {
-      calculateTotals();
-    } else {
-      setTotals(prev => ({
-        ...prev,
-        totalVal: 0,
-        totalProfit: 0,
-        bistVal: 0,
-        usVal: 0,
-        fundVal: 0,
-        bistProfit: 0,
-        usProfit: 0,
-        fundProfit: 0,
-        bistRealizedProfit: 0,
-        usRealizedProfit: 0,
-        fundRealizedProfit: 0
+      // Dispatch event to Header
+      window.dispatchEvent(new CustomEvent("portfolio-updated", {
+        detail: { date: formatLastUpdated(newLastUpdated) }
       }));
     }
-  }, [assets, funds]);
+
+    setTotals(prev => ({
+      ...prev,
+      totalVal: val, totalProfit: profit,
+      bistVal, usVal, fundVal,
+      bistProfit, usProfit, fundProfit
+    }));
+    if (forceRefresh) setIsRefreshing(false);
+  }, [assets, funds, usdRate]);
+
+  useEffect(() => {
+    calculateTotals();
+  }, [calculateTotals]);
+
+  useEffect(() => {
+    const handleRefresh = () => calculateTotals(true);
+    window.addEventListener("portfolio-refresh-request", handleRefresh);
+    return () => window.removeEventListener("portfolio-refresh-request", handleRefresh);
+  }, [calculateTotals]);
+
+  const formatLastUpdated = (date: any) => {
+    if (!date) return "-";
+    const d = date instanceof Date ? date : new Date(date);
+    return d.toLocaleString("tr-TR", {
+      day: "2-digit", month: "2-digit", year: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }).replace(",", "");
+  };
 
   if (!mounted) return null;
 
   return (
     <main className="container mx-auto px-6 py-10">
+      {/* Top Section */}
+      <div className="mb-10">
+        <h1 className="text-2xl font-semibold tracking-tight text-white line-clamp-1">Varlık Takip</h1>
+        <p className="text-white/60 text-sm mt-1">Varlıklarınızın güncel durumunu izleyin.</p>
+      </div>
       {/* Özet Kartları */}
       {/* Özet Kartları */}
       {/* Özet Kartları */}
@@ -394,10 +387,8 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Tabs System */}
       <Tabs defaultValue="bist" className="space-y-8" onValueChange={(val) => setActiveTab(val)}>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <TabsList className="bg-zinc-900/50 p-1 border border-zinc-800/50 rounded-xl">
             <TabsTrigger value="bist" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2">
               <Landmark className="w-3.5 h-3.5" />
@@ -618,6 +609,6 @@ export default function DashboardPage() {
         onOpenChange={setIsFundFormOpen}
         onSuccess={() => fetchFundsOnly(false)}
       />
-    </main>
+    </main >
   );
 }

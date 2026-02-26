@@ -8,9 +8,10 @@ import {
     History,
     LogOut,
     Coins,
-    Bell,
     LayoutDashboard,
     Menu,
+    TrendingUp,
+    Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,10 +39,27 @@ export function Header() {
     const { data: session } = useSession();
     const pathname = usePathname();
     const [mounted, setMounted] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     useEffect(() => {
         setMounted(true);
+
+        const handleUpdate = (e: any) => {
+            if (e.detail?.date) {
+                setLastUpdated(e.detail.date);
+                setIsRefreshing(false);
+            }
+        };
+
+        window.addEventListener("portfolio-updated", handleUpdate);
+        return () => window.removeEventListener("portfolio-updated", handleUpdate);
     }, []);
+
+    const handleRefreshRequest = () => {
+        setIsRefreshing(true);
+        window.dispatchEvent(new CustomEvent("portfolio-refresh-request"));
+    };
 
     // Only show header on dashboard pages
     if (!pathname.startsWith("/dashboard")) return null;
@@ -55,125 +73,128 @@ export function Header() {
 
     return (
         <header className="border-b border-zinc-900/50 sticky top-0 z-50 bg-black/60 backdrop-blur-md">
-            <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-                {/* Mobile Menu Trigger */}
-                <div className="md:hidden">
-                    <Sheet>
-                        <SheetTrigger asChild>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-zinc-500 hover:text-zinc-100 hover:bg-zinc-900/50 rounded-full"
+            <div className="container mx-auto px-6 h-16 flex items-center">
+                {/* Left Area (Logo + Mobile Trigger) */}
+                <div className="flex-1 flex items-center gap-4">
+                    {/* Mobile Menu Trigger */}
+                    <div className="md:hidden">
+                        <Sheet>
+                            <SheetTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-zinc-500 hover:text-zinc-100 hover:bg-zinc-900/50 rounded-full"
+                                >
+                                    <Menu className="w-5 h-5" />
+                                </Button>
+                            </SheetTrigger>
+                            <SheetContent
+                                side="left"
+                                className="w-80 border-r border-zinc-900 bg-black/95 backdrop-blur-xl p-0"
                             >
-                                <Menu className="w-5 h-5" />
-                            </Button>
-                        </SheetTrigger>
-                        <SheetContent
-                            side="left"
-                            className="w-80 border-r border-zinc-900 bg-black/95 backdrop-blur-xl p-0"
-                        >
-                            <SheetHeader className="sr-only">
-                                <SheetTitle>Navigasyon Menüsü</SheetTitle>
-                            </SheetHeader>
-                            <div className="flex flex-col h-full">
-                                <div className="p-6 border-b border-zinc-900/50">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-linear-to-br from-zinc-800 to-black p-2 rounded-xl border border-zinc-800/50">
-                                            <Wallet className="w-5 h-5 text-zinc-100" />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <h1 className="text-sm font-bold tracking-tight text-zinc-100">
-                                                Varlık Takip
-                                            </h1>
-                                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none">
-                                                Pro Panel
-                                            </span>
+                                <SheetHeader className="sr-only">
+                                    <SheetTitle>Navigasyon Menüsü</SheetTitle>
+                                </SheetHeader>
+                                <div className="flex flex-col h-full">
+                                    <div className="p-6 border-b border-zinc-900/50">
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-linear-to-br from-zinc-800 to-black p-2 rounded-xl border border-zinc-800/50">
+                                                <Wallet className="w-5 h-5 text-zinc-100" />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <h1 className="text-sm font-bold tracking-tight text-zinc-100">
+                                                    Varlık Takip
+                                                </h1>
+                                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none">
+                                                    Pro Panel
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <nav className="flex-1 p-4 space-y-2 mt-4">
-                                    {navLinks.map((link) => {
-                                        const isActive = pathname === link.href;
-                                        const Icon = link.icon;
-                                        return (
+                                    <nav className="flex-1 p-4 space-y-2 mt-4">
+                                        {navLinks.map((link) => {
+                                            const isActive = pathname === link.href;
+                                            const Icon = link.icon;
+                                            return (
+                                                <Link
+                                                    key={link.href}
+                                                    href={link.href}
+                                                    className={cn(
+                                                        "flex items-center gap-3 px-4 py-3 text-sm font-semibold transition-all duration-300 rounded-xl group",
+                                                        isActive
+                                                            ? "text-white bg-zinc-900"
+                                                            : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900/30",
+                                                    )}
+                                                >
+                                                    <Icon
+                                                        className={cn(
+                                                            "w-4 h-4",
+                                                            isActive ? "text-zinc-100" : "text-zinc-500",
+                                                        )}
+                                                    />
+                                                    <span>{link.label}</span>
+                                                </Link>
+                                            );
+                                        })}
+                                        <div className="pt-2">
                                             <Link
-                                                key={link.href}
-                                                href={link.href}
+                                                href="/dashboard/profile"
                                                 className={cn(
                                                     "flex items-center gap-3 px-4 py-3 text-sm font-semibold transition-all duration-300 rounded-xl group",
-                                                    isActive
+                                                    pathname === "/dashboard/profile"
                                                         ? "text-white bg-zinc-900"
                                                         : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900/30",
                                                 )}
                                             >
-                                                <Icon
+                                                <UserIcon
                                                     className={cn(
                                                         "w-4 h-4",
-                                                        isActive ? "text-zinc-100" : "text-zinc-500",
+                                                        pathname === "/dashboard/profile"
+                                                            ? "text-zinc-100"
+                                                            : "text-zinc-500",
                                                     )}
                                                 />
-                                                <span>{link.label}</span>
+                                                <span>Profilim</span>
                                             </Link>
-                                        );
-                                    })}
-                                    <div className="pt-2">
-                                        <Link
-                                            href="/dashboard/profile"
-                                            className={cn(
-                                                "flex items-center gap-3 px-4 py-3 text-sm font-semibold transition-all duration-300 rounded-xl group",
-                                                pathname === "/dashboard/profile"
-                                                    ? "text-white bg-zinc-900"
-                                                    : "text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900/30",
-                                            )}
-                                        >
-                                            <UserIcon
-                                                className={cn(
-                                                    "w-4 h-4",
-                                                    pathname === "/dashboard/profile"
-                                                        ? "text-zinc-100"
-                                                        : "text-zinc-500",
-                                                )}
-                                            />
-                                            <span>Profilim</span>
-                                        </Link>
-                                    </div>
-                                </nav>
-                                <div className="p-6 border-t border-zinc-900/50 mt-auto">
-                                    <div className="flex items-center gap-3 px-2">
-                                        <div className="h-9 w-9 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
-                                            <UserIcon className="h-4 w-4" />
                                         </div>
-                                        <div className="flex flex-col">
-                                            <p className="text-sm font-bold leading-none text-white">
-                                                {session?.user?.name || "Kullanıcı"}
-                                            </p>
-                                            <p className="text-[10px] text-zinc-500 font-medium truncate max-w-37.5">
-                                                {session?.user?.email}
-                                            </p>
+                                    </nav>
+                                    <div className="p-6 border-t border-zinc-900/50 mt-auto">
+                                        <div className="flex items-center gap-3 px-2">
+                                            <div className="h-9 w-9 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400">
+                                                <UserIcon className="h-4 w-4" />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <p className="text-sm font-bold leading-none text-white">
+                                                    {session?.user?.name || "Kullanıcı"}
+                                                </p>
+                                                <p className="text-[10px] text-zinc-500 font-medium truncate max-w-37.5">
+                                                    {session?.user?.email}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        </SheetContent>
-                    </Sheet>
+                            </SheetContent>
+                        </Sheet>
+                    </div>
+
+                    {/* Logo Area */}
+                    <Link href="/dashboard" className="flex items-center gap-3.5 group">
+                        <div className="bg-linear-to-br from-zinc-800 to-black p-2 rounded-xl border border-zinc-800/50 shadow-2xl group-hover:border-zinc-700 transition-all duration-300">
+                            <Wallet className="w-5 h-5 text-zinc-100" />
+                        </div>
+                        <div className="flex flex-col gap-0">
+                            <h1 className="text-sm font-bold tracking-tight text-zinc-100 uppercase">
+                                Varlık Takip
+                            </h1>
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none">
+                                Pro Panel
+                            </span>
+                        </div>
+                    </Link>
                 </div>
 
-                {/* Logo Area */}
-                <Link href="/dashboard" className="flex items-center gap-3.5 group">
-                    <div className="bg-linear-to-br from-zinc-800 to-black p-2 rounded-xl border border-zinc-800/50 shadow-2xl group-hover:border-zinc-700 transition-all duration-300">
-                        <Wallet className="w-5 h-5 text-zinc-100" />
-                    </div>
-                    <div className="flex flex-col gap-0">
-                        <h1 className="text-sm font-bold tracking-tight text-zinc-100">
-                            Varlık Takip
-                        </h1>
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest leading-none">
-                            Pro Panel
-                        </span>
-                    </div>
-                </Link>
-
-                {/* Navigation Menu (Desktop) */}
+                {/* Center: Navigation Menu (Desktop) */}
                 <nav className="hidden md:flex items-center gap-1">
                     {navLinks.map((link) => {
                         const isActive = pathname === link.href;
@@ -208,16 +229,29 @@ export function Header() {
                     })}
                 </nav>
 
-                {/* User Action Area */}
-                <div className="flex items-center gap-3">
-                    {/* Notifications (Visual only) */}
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="hidden sm:flex text-zinc-500 hover:text-zinc-100 hover:bg-zinc-900/50 rounded-full"
-                    >
-                        <Bell className="w-4 h-4" />
-                    </Button>
+                {/* Right: User Action Area */}
+                <div className="flex-1 flex items-center justify-end gap-3">
+                    <div className="flex items-center gap-2 sm:gap-3 bg-zinc-900/40 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full border border-zinc-800/50 backdrop-blur-sm transition-all hover:border-zinc-700/50">
+                        {lastUpdated && (
+                            <div className="hidden sm:flex flex-col items-end pr-1 scale-90 origin-right">
+                                <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider leading-none">Senkronize</span>
+                                <span className="text-[12px] text-zinc-300 font-mono tracking-tighter leading-tight mt-0.5">{lastUpdated}</span>
+                            </div>
+                        )}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={handleRefreshRequest}
+                            disabled={isRefreshing}
+                            className="h-7 w-7 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition-all"
+                        >
+                            {isRefreshing ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                                <TrendingUp className="w-3.5 h-3.5" />
+                            )}
+                        </Button>
+                    </div>
 
                     <div className="h-6 w-px bg-zinc-900 hidden sm:block mx-1" />
 

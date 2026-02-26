@@ -37,7 +37,16 @@ export async function GET(
                         change: cachedData.change,
                         changePercent: cachedData.changePercent,
                         isCached: true,
-                        cachedAt: cachedData.createdAt
+                        cachedAt: cachedData.createdAt,
+                        cachedAtFormatted: new Date(cachedData.createdAt).toLocaleString("tr-TR", {
+                            timeZone: "Europe/Istanbul",
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                        }).replace(",", "")
                     }, {
                         headers: {
                             "Cache-Control": "no-store, max-age=0"
@@ -93,7 +102,20 @@ export async function GET(
         );
 
         return NextResponse.json(
-            { ...responseData, isCached: false, cachedAt: new Date() },
+            {
+                ...responseData,
+                isCached: false,
+                cachedAt: new Date(),
+                cachedAtFormatted: new Date().toLocaleString("tr-TR", {
+                    timeZone: "Europe/Istanbul",
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                }).replace(",", "")
+            },
             {
                 headers: {
                     "Cache-Control": "no-store, max-age=0"
