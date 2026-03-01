@@ -4,6 +4,7 @@ import "@/lib/models/Bank";
 import "@/lib/models/Asset";
 import "@/lib/models/PublicOffering";
 import "@/lib/models/PriceCache";
+import "@/lib/models/Goal";
 
 const MONGODB_URI = process.env.MONGODB_URI;
 

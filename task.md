@@ -33,7 +33,17 @@
     - [x] Eski veriler için otomatik migrasyon desteği
     - [x] Shadcn `ScrollArea` ile özel scrollbar entegrasyonu
 
+## Birikim Hedefleri (Savings Goals) 🎯
+- [x] Veritabanı Modeli (`Goal`) Oluşturulması
+- [x] API Rotalarının Hazırlanması (`/api/goals`)
+- [x] Dashboard'a `GoalProgress` Bileşeni Eklenmesi
+- [x] Hedef Ekleme/Düzenleme Formu
+- [x] Progress Bar ve "Hedefe Kalan" Hesaplama Mantığı
+- [x] Hedef Görünürlük Ayarı (Kapatma desteği) ✅
+- [x] "Geri Aç" Butonuna Framer Motion Animasyonu (Entry/Exit) ✅
+- [x] Tutarı Girerken Binlik Ayracı (100.000 Formatı) ✅
+
 ## Son Kontroller ve Yayın 🚀
-- [x] Responsive Tasarım Kontrolü
-- [x] Performans Optimizasyonu (Kripto Dialog)
-- [x] Son Walkthrough Hazırlığı
+- [ ] Responsive Tasarım Kontrolü
+- [ ] Performans Optimizasyonu (Kripto Dialog)
+- [ ] Son Walkthrough Hazırlığı

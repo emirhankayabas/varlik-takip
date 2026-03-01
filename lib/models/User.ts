@@ -6,6 +6,7 @@ export interface IUser {
     password: string;
     name?: string;
     cryptoWatchlist?: { id: string; symbol: string; name: string; image: string }[];
+    hideGoals?: boolean;
     emailVerified: boolean;
     createdAt: Date;
     updatedAt: Date;
@@ -42,6 +43,10 @@ const UserSchema = new Schema<IUser>(
                 { id: "ripple", symbol: "XRP", name: "Ripple", image: "https://assets.coingecko.com/coins/images/44/small/xrp-symbol-white-128.png" },
                 { id: "dogecoin", symbol: "DOGE", name: "Dogecoin", image: "https://assets.coingecko.com/coins/images/5/small/dogecoin.png" },
             ],
+        },
+        hideGoals: {
+            type: Boolean,
+            default: false,
         },
         emailVerified: {
             type: Boolean,

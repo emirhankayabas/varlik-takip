@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Wallet, TrendingUp, Loader2, HandCoins, ChevronDown } from "lucide-react";
+import { Plus, Wallet, TrendingUp, Loader2, HandCoins } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { AssetForm } from "@/components/asset-form";
@@ -15,9 +15,16 @@ import { FundForm } from "@/components/fund-form";
 import { FundTable } from "@/components/fund-table";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Landmark, Globe, PieChart, Calendar as CalendarIconUI } from "lucide-react";
+import {
+  Landmark,
+  Globe,
+  PieChart,
+  Calendar as CalendarIconUI,
+  Target,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { isTodayInIpoDate } from "@/lib/ipo-utils";
+import { GoalProgress } from "@/components/goal-progress";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -31,8 +38,15 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("bist");
   const [usdRate, setUsdRate] = useState(1);
-  const [priceMap, setPriceMap] = useState<Record<string, { price: number; changePercent?: number }>>({});
-  const [fundPriceMap, setFundPriceMap] = useState<Record<string, { price: number; changePercent?: number; change?: number; name?: string }>>({});
+  const [priceMap, setPriceMap] = useState<
+    Record<string, { price: number; changePercent?: number }>
+  >({});
+  const [fundPriceMap, setFundPriceMap] = useState<
+    Record<
+      string,
+      { price: number; changePercent?: number; change?: number; name?: string }
+    >
+  >({});
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [totals, setTotals] = useState({
@@ -47,29 +61,35 @@ export default function DashboardPage() {
     fundProfit: 0,
     bistRealizedProfit: 0,
     usRealizedProfit: 0,
-    fundRealizedProfit: 0
+    fundRealizedProfit: 0,
   });
+  const [hideGoals, setHideGoals] = useState(false);
 
   const fetchAssetsOnly = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
       const [assetRes, salesRes] = await Promise.all([
         fetch("/api/assets"),
-        fetch("/api/assets/sales")
+        fetch("/api/assets/sales"),
       ]);
 
       const assetData = await assetRes.json();
       const salesData = await salesRes.json();
 
       setAssets(assetData);
-      setTotals(prev => {
-        const bistRealized = salesData.sales.filter((s: any) => s.market === "BIST").reduce((sum: number, s: any) => sum + (s.realizedProfit || 0), 0);
-        const usRealized = salesData.sales.filter((s: any) => s.market === "US").reduce((sum: number, s: any) => sum + (s.realizedProfit || 0), 0);
+      setTotals((prev) => {
+        const bistRealized = salesData.sales
+          .filter((s: any) => s.market === "BIST")
+          .reduce((sum: number, s: any) => sum + (s.realizedProfit || 0), 0);
+        const usRealized = salesData.sales
+          .filter((s: any) => s.market === "US")
+          .reduce((sum: number, s: any) => sum + (s.realizedProfit || 0), 0);
         return {
           ...prev,
           bistRealizedProfit: bistRealized,
           usRealizedProfit: usRealized,
-          realizedProfit: bistRealized + (usRealized * usdRate) + prev.fundRealizedProfit
+          realizedProfit:
+            bistRealized + usRealized * usdRate + prev.fundRealizedProfit,
         };
       });
     } catch (error) {
@@ -97,18 +117,21 @@ export default function DashboardPage() {
     try {
       const [fundsRes, salesRes] = await Promise.all([
         fetch("/api/funds"),
-        fetch("/api/funds/sales")
+        fetch("/api/funds/sales"),
       ]);
       const data = await fundsRes.json();
       const salesData = await salesRes.json();
 
       setFunds(data);
-      setTotals(prev => {
+      setTotals((prev) => {
         const fundRealized = salesData.totalRealizedProfit || 0;
         return {
           ...prev,
           fundRealizedProfit: fundRealized,
-          realizedProfit: prev.bistRealizedProfit + (prev.usRealizedProfit * usdRate) + fundRealized
+          realizedProfit:
+            prev.bistRealizedProfit +
+            prev.usRealizedProfit * usdRate +
+            fundRealized,
         };
       });
     } catch (error) {
@@ -125,10 +148,33 @@ export default function DashboardPage() {
     // Sonra Varlıklar ve Fonlar (Yeni verileri görür)
     await Promise.all([
       fetchAssetsOnly(false),
-      fetchFundsOnly(false)
+      fetchFundsOnly(false),
+      fetchPreferences(),
     ]);
     setLoading(false);
   }, [fetchAssetsOnly, fetchIposOnly, fetchFundsOnly]);
+
+  const fetchPreferences = async () => {
+    try {
+      const res = await fetch("/api/user/preferences");
+      const data = await res.json();
+      if (data.hideGoals !== undefined) {
+        setHideGoals(data.hideGoals);
+      }
+    } catch (e) {}
+  };
+
+  const toggleHideGoals = async () => {
+    const newValue = !hideGoals;
+    setHideGoals(newValue);
+    try {
+      await fetch("/api/user/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hideGoals: newValue }),
+      });
+    } catch (e) {}
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -150,113 +196,170 @@ export default function DashboardPage() {
     fetchAgendaIpos();
   }, []);
 
-  const calculateTotals = useCallback(async (forceRefresh = false) => {
-    if (assets.length === 0 && funds.length === 0) {
-      setTotals(prev => ({
-        ...prev,
-        totalVal: 0, totalProfit: 0,
-        bistVal: 0, usVal: 0, fundVal: 0,
-        bistProfit: 0, usProfit: 0, fundProfit: 0,
-        bistRealizedProfit: 0, usRealizedProfit: 0, fundRealizedProfit: 0
-      }));
-      return;
-    }
+  const calculateTotals = useCallback(
+    async (forceRefresh = false) => {
+      if (assets.length === 0 && funds.length === 0) {
+        setTotals((prev) => ({
+          ...prev,
+          totalVal: 0,
+          totalProfit: 0,
+          bistVal: 0,
+          usVal: 0,
+          fundVal: 0,
+          bistProfit: 0,
+          usProfit: 0,
+          fundProfit: 0,
+          bistRealizedProfit: 0,
+          usRealizedProfit: 0,
+          fundRealizedProfit: 0,
+        }));
+        return;
+      }
 
-    if (forceRefresh) setIsRefreshing(true);
-    const latestDates: Date[] = [];
-    let currentUsdRate = usdRate;
+      if (forceRefresh) setIsRefreshing(true);
+      const latestDates: Date[] = [];
+      let currentUsdRate = usdRate;
 
-    const uniqueSymbols = Array.from(new Set(assets.map((a: any) => a.symbol)));
-    const uniqueFundSymbols = Array.from(new Set(funds.map((f: any) => f.symbol)));
+      const uniqueSymbols = Array.from(
+        new Set(assets.map((a: any) => a.symbol)),
+      );
+      const uniqueFundSymbols = Array.from(
+        new Set(funds.map((f: any) => f.symbol)),
+      );
 
-    const currentPriceMap: Record<string, { price: number; changePercent?: number }> = {};
-    const currentFundPriceMap: Record<string, { price: number; changePercent?: number; change?: number; name?: string }> = {};
+      const currentPriceMap: Record<
+        string,
+        { price: number; changePercent?: number }
+      > = {};
+      const currentFundPriceMap: Record<
+        string,
+        {
+          price: number;
+          changePercent?: number;
+          change?: number;
+          name?: string;
+        }
+      > = {};
 
-    try {
-      await Promise.all([
-        ...uniqueSymbols.map(async (symbol) => {
-          try {
-            const res = await fetch(`/api/prices/${symbol}${forceRefresh ? "?refresh=true" : ""}`);
-            const p = await res.json();
-            currentPriceMap[symbol] = { price: p.price, changePercent: p.changePercent };
-            if (p.cachedAt) latestDates.push(new Date(p.cachedAt));
-          } catch (e) { }
-        }),
-        ...uniqueFundSymbols.map(async (symbol) => {
-          try {
-            const res = await fetch(`/api/prices/fund/${symbol}${forceRefresh ? "?refresh=true" : ""}`);
-            const p = await res.json();
-            currentFundPriceMap[symbol] = {
-              price: p.price, changePercent: p.changePercent,
-              change: p.change, name: p.name
-            };
-            if (p.cachedAt) latestDates.push(new Date(p.cachedAt));
-          } catch (e) { }
-        }),
-        (async () => {
-          try {
-            const res = await fetch(`/api/prices/USDTRY=X${forceRefresh ? "?refresh=true" : ""}`);
-            const p = await res.json();
-            if (p.price) {
-              currentUsdRate = p.price;
-              setUsdRate(p.price);
-            }
-            if (p.cachedAt) latestDates.push(new Date(p.cachedAt));
-          } catch (e) { }
-        })()
-      ]);
-    } catch (e) {
-      console.error("Fiyat güncelleme hatası");
-    }
+      try {
+        await Promise.all([
+          ...uniqueSymbols.map(async (symbol) => {
+            try {
+              const res = await fetch(
+                `/api/prices/${symbol}${forceRefresh ? "?refresh=true" : ""}`,
+              );
+              const p = await res.json();
+              currentPriceMap[symbol] = {
+                price: p.price,
+                changePercent: p.changePercent,
+              };
+              if (p.cachedAt) latestDates.push(new Date(p.cachedAt));
+            } catch (e) {}
+          }),
+          ...uniqueFundSymbols.map(async (symbol) => {
+            try {
+              const res = await fetch(
+                `/api/prices/fund/${symbol}${forceRefresh ? "?refresh=true" : ""}`,
+              );
+              const p = await res.json();
+              currentFundPriceMap[symbol] = {
+                price: p.price,
+                changePercent: p.changePercent,
+                change: p.change,
+                name: p.name,
+              };
+              if (p.cachedAt) latestDates.push(new Date(p.cachedAt));
+            } catch (e) {}
+          }),
+          (async () => {
+            try {
+              const res = await fetch(
+                `/api/prices/USDTRY=X${forceRefresh ? "?refresh=true" : ""}`,
+              );
+              const p = await res.json();
+              if (p.price) {
+                currentUsdRate = p.price;
+                setUsdRate(p.price);
+              }
+              if (p.cachedAt) latestDates.push(new Date(p.cachedAt));
+            } catch (e) {}
+          })(),
+        ]);
+      } catch (e) {
+        console.error("Fiyat güncelleme hatası");
+      }
 
-    let val = 0, profit = 0, bistVal = 0, usVal = 0, fundVal = 0;
-    let bistProfit = 0, usProfit = 0, fundProfit = 0;
+      let val = 0,
+        profit = 0,
+        bistVal = 0,
+        usVal = 0,
+        fundVal = 0;
+      let bistProfit = 0,
+        usProfit = 0,
+        fundProfit = 0;
 
-    for (const asset of assets as any[]) {
-      const priceData = currentPriceMap[asset.symbol];
-      if (priceData) {
-        const itemVal = asset.amount * priceData.price;
-        const itemProfit = itemVal - asset.amount * asset.buyPrice;
-        if (asset.market === "US") {
-          usVal += itemVal; usProfit += itemProfit;
-          val += itemVal * currentUsdRate; profit += itemProfit * currentUsdRate;
-        } else {
-          bistVal += itemVal; bistProfit += itemProfit;
-          val += itemVal; profit += itemProfit;
+      for (const asset of assets as any[]) {
+        const priceData = currentPriceMap[asset.symbol];
+        if (priceData) {
+          const itemVal = asset.amount * priceData.price;
+          const itemProfit = itemVal - asset.amount * asset.buyPrice;
+          if (asset.market === "US") {
+            usVal += itemVal;
+            usProfit += itemProfit;
+            val += itemVal * currentUsdRate;
+            profit += itemProfit * currentUsdRate;
+          } else {
+            bistVal += itemVal;
+            bistProfit += itemProfit;
+            val += itemVal;
+            profit += itemProfit;
+          }
         }
       }
-    }
 
-    for (const fund of funds as any[]) {
-      const priceData = currentFundPriceMap[fund.symbol];
-      if (priceData) {
-        const itemVal = fund.amount * priceData.price;
-        const itemProfit = itemVal - fund.amount * fund.buyPrice;
-        val += itemVal; fundVal += itemVal;
-        profit += itemProfit; fundProfit += itemProfit;
+      for (const fund of funds as any[]) {
+        const priceData = currentFundPriceMap[fund.symbol];
+        if (priceData) {
+          const itemVal = fund.amount * priceData.price;
+          const itemProfit = itemVal - fund.amount * fund.buyPrice;
+          val += itemVal;
+          fundVal += itemVal;
+          profit += itemProfit;
+          fundProfit += itemProfit;
+        }
       }
-    }
 
-    setPriceMap(currentPriceMap);
-    setFundPriceMap(currentFundPriceMap);
-    if (latestDates.length > 0) {
-      const newLastUpdated = new Date(Math.max(...latestDates.map(d => d.getTime())));
-      setLastUpdated(newLastUpdated);
+      setPriceMap(currentPriceMap);
+      setFundPriceMap(currentFundPriceMap);
+      if (latestDates.length > 0) {
+        const newLastUpdated = new Date(
+          Math.max(...latestDates.map((d) => d.getTime())),
+        );
+        setLastUpdated(newLastUpdated);
 
-      // Dispatch event to Header
-      window.dispatchEvent(new CustomEvent("portfolio-updated", {
-        detail: { date: formatLastUpdated(newLastUpdated) }
+        // Dispatch event to Header
+        window.dispatchEvent(
+          new CustomEvent("portfolio-updated", {
+            detail: { date: formatLastUpdated(newLastUpdated) },
+          }),
+        );
+      }
+
+      setTotals((prev) => ({
+        ...prev,
+        totalVal: val,
+        totalProfit: profit,
+        bistVal,
+        usVal,
+        fundVal,
+        bistProfit,
+        usProfit,
+        fundProfit,
       }));
-    }
-
-    setTotals(prev => ({
-      ...prev,
-      totalVal: val, totalProfit: profit,
-      bistVal, usVal, fundVal,
-      bistProfit, usProfit, fundProfit
-    }));
-    if (forceRefresh) setIsRefreshing(false);
-  }, [assets, funds, usdRate]);
+      if (forceRefresh) setIsRefreshing(false);
+    },
+    [assets, funds, usdRate],
+  );
 
   useEffect(() => {
     calculateTotals();
@@ -265,16 +368,23 @@ export default function DashboardPage() {
   useEffect(() => {
     const handleRefresh = () => calculateTotals(true);
     window.addEventListener("portfolio-refresh-request", handleRefresh);
-    return () => window.removeEventListener("portfolio-refresh-request", handleRefresh);
+    return () =>
+      window.removeEventListener("portfolio-refresh-request", handleRefresh);
   }, [calculateTotals]);
 
   const formatLastUpdated = (date: any) => {
     if (!date) return "-";
     const d = date instanceof Date ? date : new Date(date);
-    return d.toLocaleString("tr-TR", {
-      day: "2-digit", month: "2-digit", year: "2-digit",
-      hour: "2-digit", minute: "2-digit", second: "2-digit"
-    }).replace(",", "");
+    return d
+      .toLocaleString("tr-TR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+      .replace(",", "");
   };
 
   if (!mounted) return null;
@@ -283,12 +393,48 @@ export default function DashboardPage() {
     <main className="container mx-auto px-6 py-10">
       {/* Top Section */}
       <div className="mb-10">
-        <h1 className="text-2xl font-semibold tracking-tight text-white line-clamp-1">Varlık Takip</h1>
-        <p className="text-white/60 text-sm mt-1">Varlıklarınızın güncel durumunu izleyin.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-white line-clamp-1">
+          Varlık Takip
+        </h1>
+        <p className="text-white/60 text-sm mt-1">
+          Varlıklarınızın güncel durumunu izleyin.
+        </p>
+        <AnimatePresence>
+          {hideGoals && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, marginTop: 0 }}
+              animate={{ opacity: 1, height: "auto", marginTop: 8 }}
+              exit={{ opacity: 0, height: 0, marginTop: 0 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="overflow-hidden"
+            >
+              <Button
+                variant="link"
+                size="sm"
+                className="text-[10px] text-zinc-500 hover:text-white p-0 h-auto"
+                onClick={toggleHideGoals}
+              >
+                <Target className="w-3 h-3 mr-1" />
+                Hedefleri Geri Aç
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-      {/* Özet Kartları */}
-      {/* Özet Kartları */}
-      {/* Özet Kartları */}
+
+      {/* Birikim Hedefi Bölümü */}
+      {!hideGoals && (
+        <GoalProgress
+          totals={{
+            BIST: totals.bistVal,
+            US: totals.usVal,
+            FUND: totals.fundVal,
+          }}
+          usdRate={usdRate}
+          onHide={toggleHideGoals}
+        />
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         <Card className="group relative overflow-hidden gap-y-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -297,20 +443,38 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold tracking-tight">
-              ₺{totals.totalVal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+              ₺
+              {totals.totalVal.toLocaleString("tr-TR", {
+                minimumFractionDigits: 2,
+              })}
             </div>
             <div className="mt-4 border-t border-zinc-800 pt-4">
               <div className="flex justify-between items-center text-[12px] py-0.5">
                 <span className="text-white/70">BIST Hisseleri</span>
-                <span className="font-semibold text-white">₺{totals.bistVal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                <span className="font-semibold text-white">
+                  ₺
+                  {totals.bistVal.toLocaleString("tr-TR", {
+                    minimumFractionDigits: 2,
+                  })}
+                </span>
               </div>
               <div className="flex justify-between items-center text-[12px] py-0.5">
                 <span className="text-white/70">ABD Hisseleri</span>
-                <span className="font-semibold text-white">${totals.usVal.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                <span className="font-semibold text-white">
+                  $
+                  {totals.usVal.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                  })}
+                </span>
               </div>
               <div className="flex justify-between items-center text-[12px] py-0.5">
                 <span className="text-white/70">Yatırım Fonları</span>
-                <span className="font-semibold text-white">₺{totals.fundVal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</span>
+                <span className="font-semibold text-white">
+                  ₺
+                  {totals.fundVal.toLocaleString("tr-TR", {
+                    minimumFractionDigits: 2,
+                  })}
+                </span>
               </div>
             </div>
           </CardContent>
@@ -318,33 +482,68 @@ export default function DashboardPage() {
 
         <Card className="group relative gap-y-0">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Toplam Kar / Zarar</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Toplam Kar / Zarar
+            </CardTitle>
             <TrendingUp className="w-4 h-4 text-zinc-500" />
           </CardHeader>
           <CardContent>
-            <div className={cn(
-              "text-2xl font-bold tracking-tight",
-              totals.totalProfit >= 0 ? "text-emerald-400" : "text-red-400"
-            )}>
-              {totals.totalProfit >= 0 ? "+" : ""}₺{totals.totalProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+            <div
+              className={cn(
+                "text-2xl font-bold tracking-tight",
+                totals.totalProfit >= 0 ? "text-emerald-400" : "text-red-400",
+              )}
+            >
+              {totals.totalProfit >= 0 ? "+" : ""}₺
+              {totals.totalProfit.toLocaleString("tr-TR", {
+                minimumFractionDigits: 2,
+              })}
             </div>
             <div className="mt-4 border-t border-zinc-800 pt-4">
               <div className="flex justify-between items-center text-[12px] py-0.5">
                 <span className="text-white/70">BIST Kar/Zarar</span>
-                <span className={cn("font-semibold", totals.bistProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
-                  {totals.bistProfit >= 0 ? "+" : ""}₺{totals.bistProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+                <span
+                  className={cn(
+                    "font-semibold",
+                    totals.bistProfit >= 0
+                      ? "text-emerald-400"
+                      : "text-red-400",
+                  )}
+                >
+                  {totals.bistProfit >= 0 ? "+" : ""}₺
+                  {totals.bistProfit.toLocaleString("tr-TR", {
+                    minimumFractionDigits: 2,
+                  })}
                 </span>
               </div>
               <div className="flex justify-between items-center text-[12px] py-0.5">
                 <span className="text-white/70">ABD Kar/Zarar</span>
-                <span className={cn("font-semibold", totals.usProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
-                  {totals.usProfit >= 0 ? "+" : ""}${totals.usProfit.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                <span
+                  className={cn(
+                    "font-semibold",
+                    totals.usProfit >= 0 ? "text-emerald-400" : "text-red-400",
+                  )}
+                >
+                  {totals.usProfit >= 0 ? "+" : ""}$
+                  {totals.usProfit.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                  })}
                 </span>
               </div>
               <div className="flex justify-between items-center text-[12px] py-0.5">
                 <span className="text-white/70">Fon Kar/Zarar</span>
-                <span className={cn("font-semibold", totals.fundProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
-                  {totals.fundProfit >= 0 ? "+" : ""}₺{totals.fundProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+                <span
+                  className={cn(
+                    "font-semibold",
+                    totals.fundProfit >= 0
+                      ? "text-emerald-400"
+                      : "text-red-400",
+                  )}
+                >
+                  {totals.fundProfit >= 0 ? "+" : ""}₺
+                  {totals.fundProfit.toLocaleString("tr-TR", {
+                    minimumFractionDigits: 2,
+                  })}
                 </span>
               </div>
             </div>
@@ -354,55 +553,110 @@ export default function DashboardPage() {
         <Card className="group relative overflow-hidden gap-y-0">
           <Link href="/dashboard/sales" className="absolute inset-0 z-10" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Toplam Gerçekleşen Kar</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Toplam Gerçekleşen Kar
+            </CardTitle>
             <HandCoins className="w-4 h-4 text-zinc-500" />
           </CardHeader>
           <CardContent>
-            <div className={cn(
-              "text-2xl font-bold tracking-tight",
-              totals.realizedProfit >= 0 ? "text-emerald-400" : "text-red-400"
-            )}>
-              {totals.realizedProfit >= 0 ? "+" : ""}₺{totals.realizedProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+            <div
+              className={cn(
+                "text-2xl font-bold tracking-tight",
+                totals.realizedProfit >= 0
+                  ? "text-emerald-400"
+                  : "text-red-400",
+              )}
+            >
+              {totals.realizedProfit >= 0 ? "+" : ""}₺
+              {totals.realizedProfit.toLocaleString("tr-TR", {
+                minimumFractionDigits: 2,
+              })}
             </div>
             <div className="mt-4 border-t border-zinc-800 pt-4">
               <div className="flex justify-between items-center text-[12px] py-0.5">
                 <span className="text-white/70">BIST Gerçekleşen Kar</span>
-                <span className={cn("font-semibold", totals.bistRealizedProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
-                  {totals.bistRealizedProfit >= 0 ? "+" : ""}₺{totals.bistRealizedProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+                <span
+                  className={cn(
+                    "font-semibold",
+                    totals.bistRealizedProfit >= 0
+                      ? "text-emerald-400"
+                      : "text-red-400",
+                  )}
+                >
+                  {totals.bistRealizedProfit >= 0 ? "+" : ""}₺
+                  {totals.bistRealizedProfit.toLocaleString("tr-TR", {
+                    minimumFractionDigits: 2,
+                  })}
                 </span>
               </div>
               <div className="flex justify-between items-center text-[12px] py-0.5">
                 <span className="text-white/70">ABD Gerçekleşen Kar</span>
-                <span className={cn("font-semibold", totals.usRealizedProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
-                  {totals.usRealizedProfit >= 0 ? "+" : ""}${totals.usRealizedProfit.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                <span
+                  className={cn(
+                    "font-semibold",
+                    totals.usRealizedProfit >= 0
+                      ? "text-emerald-400"
+                      : "text-red-400",
+                  )}
+                >
+                  {totals.usRealizedProfit >= 0 ? "+" : ""}$
+                  {totals.usRealizedProfit.toLocaleString("en-US", {
+                    minimumFractionDigits: 2,
+                  })}
                 </span>
               </div>
               <div className="flex justify-between items-center text-[12px] py-0.5">
                 <span className="text-white/70">Fon Gerçekleşen Kar</span>
-                <span className={cn("font-semibold", totals.fundRealizedProfit >= 0 ? "text-emerald-400" : "text-red-400")}>
-                  {totals.fundRealizedProfit >= 0 ? "+" : ""}₺{totals.fundRealizedProfit.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+                <span
+                  className={cn(
+                    "font-semibold",
+                    totals.fundRealizedProfit >= 0
+                      ? "text-emerald-400"
+                      : "text-red-400",
+                  )}
+                >
+                  {totals.fundRealizedProfit >= 0 ? "+" : ""}₺
+                  {totals.fundRealizedProfit.toLocaleString("tr-TR", {
+                    minimumFractionDigits: 2,
+                  })}
                 </span>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
-      <Tabs defaultValue="bist" className="space-y-8" onValueChange={(val) => setActiveTab(val)}>
+      <Tabs
+        defaultValue="bist"
+        className="space-y-8"
+        onValueChange={(val) => setActiveTab(val)}
+      >
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <TabsList className="bg-zinc-900/50 p-1 border border-zinc-800/50 rounded-xl">
-            <TabsTrigger value="bist" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2">
+            <TabsTrigger
+              value="bist"
+              className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2"
+            >
               <Landmark className="w-3.5 h-3.5" />
               BIST Hisseleri
             </TabsTrigger>
-            <TabsTrigger value="us" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2">
+            <TabsTrigger
+              value="us"
+              className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2"
+            >
               <Globe className="w-3.5 h-3.5" />
               ABD Hisseleri
             </TabsTrigger>
-            <TabsTrigger value="funds" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2">
+            <TabsTrigger
+              value="funds"
+              className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2"
+            >
               <PieChart className="w-3.5 h-3.5" />
               Yatırım Fonları
             </TabsTrigger>
-            <TabsTrigger value="ipo" className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2">
+            <TabsTrigger
+              value="ipo"
+              className="rounded-lg data-[state=active]:bg-zinc-800 data-[state=active]:text-white transition-all duration-300 gap-2"
+            >
               <CalendarIconUI className="w-3.5 h-3.5" />
               Halka Arzlar
             </TabsTrigger>
@@ -412,8 +666,12 @@ export default function DashboardPage() {
         <TabsContent value="bist" className="space-y-6 outline-none">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white">Portföy Detayı (BIST)</h2>
-              <p className="text-white/60 text-sm mt-1">Borsa İstanbul hisselerinizi buradan takip edin.</p>
+              <h2 className="text-xl font-semibold tracking-tight text-white">
+                Portföy Detayı (BIST)
+              </h2>
+              <p className="text-white/60 text-sm mt-1">
+                Borsa İstanbul hisselerinizi buradan takip edin.
+              </p>
             </div>
             <Button onClick={() => setIsFormOpen(true)}>
               <Plus className="w-4 h-4" />
@@ -433,7 +691,12 @@ export default function DashboardPage() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <AssetTable assets={assets} market="BIST" priceMap={priceMap} onRefresh={() => fetchAssetsOnly(false)} />
+                <AssetTable
+                  assets={assets}
+                  market="BIST"
+                  priceMap={priceMap}
+                  onRefresh={() => fetchAssetsOnly(false)}
+                />
               </motion.div>
             </AnimatePresence>
           )}
@@ -442,8 +705,12 @@ export default function DashboardPage() {
         <TabsContent value="us" className="space-y-6 outline-none">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white">Portföy Detayı (ABD)</h2>
-              <p className="text-white/60 text-sm mt-1">Amerikan borsalarındaki yatırımlarınızı izleyin.</p>
+              <h2 className="text-xl font-semibold tracking-tight text-white">
+                Portföy Detayı (ABD)
+              </h2>
+              <p className="text-white/60 text-sm mt-1">
+                Amerikan borsalarındaki yatırımlarınızı izleyin.
+              </p>
             </div>
             <Button onClick={() => setIsFormOpen(true)}>
               <Plus className="w-4 h-4" />
@@ -463,7 +730,12 @@ export default function DashboardPage() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <AssetTable assets={assets} market="US" priceMap={priceMap} onRefresh={() => fetchAssetsOnly(false)} />
+                <AssetTable
+                  assets={assets}
+                  market="US"
+                  priceMap={priceMap}
+                  onRefresh={() => fetchAssetsOnly(false)}
+                />
               </motion.div>
             </AnimatePresence>
           )}
@@ -472,8 +744,12 @@ export default function DashboardPage() {
         <TabsContent value="funds" className="space-y-6 outline-none">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold tracking-tight text-white">Fon Takibi</h2>
-              <p className="text-white/60 text-sm mt-1">Yatırım fonlarınızı buradan takip edebilir ve yönetebilirsiniz.</p>
+              <h2 className="text-xl font-semibold tracking-tight text-white">
+                Fon Takibi
+              </h2>
+              <p className="text-white/60 text-sm mt-1">
+                Yatırım fonlarınızı buradan takip edebilir ve yönetebilirsiniz.
+              </p>
             </div>
             <Button onClick={() => setIsFundFormOpen(true)}>
               <Plus className="w-4 h-4" />
@@ -493,7 +769,11 @@ export default function DashboardPage() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
               >
-                <FundTable funds={funds} priceMap={fundPriceMap} onRefresh={() => fetchFundsOnly(false)} />
+                <FundTable
+                  funds={funds}
+                  priceMap={fundPriceMap}
+                  onRefresh={() => fetchFundsOnly(false)}
+                />
               </motion.div>
             </AnimatePresence>
           )}
@@ -504,8 +784,15 @@ export default function DashboardPage() {
           {agendaIpos.length > 0 && (
             <div>
               <div className="flex items-center gap-2 mb-6">
-                <h2 className="text-xl font-semibold tracking-tight text-white">Yeni Halka Arzlar</h2>
-                <Badge variant="outline" className="text-[10px] font-bold border-zinc-800 text-zinc-500">GÜNCEL</Badge>
+                <h2 className="text-xl font-semibold tracking-tight text-white">
+                  Yeni Halka Arzlar
+                </h2>
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-bold border-zinc-800 text-zinc-500"
+                >
+                  GÜNCEL
+                </Badge>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {agendaIpos.map((ipo, idx) => {
@@ -518,7 +805,17 @@ export default function DashboardPage() {
                   const isApplicationToday = isTodayInIpoDate(ipo.date);
 
                   return (
-                    <Card key={idx} className={cn("group transition-all duration-300 hover:border-zinc-700 gap-y-1", isParticipated && "border-emerald-500/50 bg-emerald-500/5 hover:border-emerald-500/70", !isParticipated && isApplicationToday && "border-amber-500/50 bg-amber-500/5")}>
+                    <Card
+                      key={idx}
+                      className={cn(
+                        "group transition-all duration-300 hover:border-zinc-700 gap-y-1",
+                        isParticipated &&
+                          "border-emerald-500/50 bg-emerald-500/5 hover:border-emerald-500/70",
+                        !isParticipated &&
+                          isApplicationToday &&
+                          "border-amber-500/50 bg-amber-500/5",
+                      )}
+                    >
                       <CardHeader>
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-x-1.5">
@@ -529,12 +826,18 @@ export default function DashboardPage() {
                           </div>
                           <div className="flex gap-1.5">
                             {!isParticipated && isApplicationToday && (
-                              <Badge variant="outline" className="text-amber-400 bg-amber-400/10 animate-pulse border-amber-400/30">
+                              <Badge
+                                variant="outline"
+                                className="text-amber-400 bg-amber-400/10 animate-pulse border-amber-400/30"
+                              >
                                 Talep Girin
                               </Badge>
                             )}
                             {isParticipated && (
-                              <Badge variant="outline" className="text-emerald-400 bg-emerald-400/10">
+                              <Badge
+                                variant="outline"
+                                className="text-emerald-400 bg-emerald-400/10"
+                              >
                                 Katıldınız
                               </Badge>
                             )}
@@ -542,9 +845,7 @@ export default function DashboardPage() {
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <CardTitle>
-                          {ipo.name}
-                        </CardTitle>
+                        <CardTitle>{ipo.name}</CardTitle>
                         <div className="flex items-center gap-1 mt-2 text-zinc-500">
                           <CalendarIconUI className="w-3 h-3" />
                           <p className="text-[12px] font-medium tracking-tight uppercase">
@@ -563,8 +864,12 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold tracking-tight text-white">Halka Arz Takibi</h2>
-                <p className="text-white/60 text-sm mt-1">Halk arz taleplerinizi ve dağıtım sonuçlarını izleyin.</p>
+                <h2 className="text-xl font-semibold tracking-tight text-white">
+                  Halka Arz Takibi
+                </h2>
+                <p className="text-white/60 text-sm mt-1">
+                  Halk arz taleplerinizi ve dağıtım sonuçlarını izleyin.
+                </p>
               </div>
               <Button onClick={() => setIsIpoFormOpen(true)}>
                 <Plus className="w-4 h-4" />
@@ -584,7 +889,10 @@ export default function DashboardPage() {
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <IpoList offerings={publicOfferings} onRefresh={() => fetchIposOnly(false)} />
+                  <IpoList
+                    offerings={publicOfferings}
+                    onRefresh={() => fetchIposOnly(false)}
+                  />
                 </motion.div>
               </AnimatePresence>
             )}
@@ -609,6 +917,6 @@ export default function DashboardPage() {
         onOpenChange={setIsFundFormOpen}
         onSuccess={() => fetchFundsOnly(false)}
       />
-    </main >
+    </main>
   );
 }

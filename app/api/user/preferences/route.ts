@@ -11,9 +11,10 @@ export async function GET() {
 
     try {
         await dbConnect();
-        const user = await User.findById(session.user.id).select("cryptoWatchlist");
+        const user = await User.findById(session.user.id).select("cryptoWatchlist hideGoals");
 
         let watchlist = user?.cryptoWatchlist || [];
+        const hideGoals = user?.hideGoals || false;
 
         // Migration: If it's old string format
         if (watchlist.length > 0 && typeof watchlist[0] === 'string') {
@@ -42,7 +43,7 @@ export async function GET() {
             ];
         }
 
-        return NextResponse.json({ watchlist });
+        return NextResponse.json({ watchlist, hideGoals });
     } catch (error) {
         return NextResponse.json({ error: "Tercihler alınamadı" }, { status: 500 });
     }
@@ -55,17 +56,16 @@ export async function POST(request: Request) {
     }
 
     try {
-        const { watchlist } = await request.json();
-        if (!Array.isArray(watchlist)) {
-            return NextResponse.json({ error: "Geçersiz veri formatı" }, { status: 400 });
-        }
+        const { watchlist, hideGoals } = await request.json();
 
         await dbConnect();
-        await User.findByIdAndUpdate(session.user.id, {
-            cryptoWatchlist: watchlist
-        });
+        const updateData: any = {};
+        if (watchlist !== undefined) updateData.cryptoWatchlist = watchlist;
+        if (hideGoals !== undefined) updateData.hideGoals = hideGoals;
 
-        return NextResponse.json({ success: true, watchlist });
+        await User.findByIdAndUpdate(session.user.id, updateData);
+
+        return NextResponse.json({ success: true, watchlist, hideGoals });
     } catch (error) {
         return NextResponse.json({ error: "Tercihler kaydedilemedi" }, { status: 500 });
     }
