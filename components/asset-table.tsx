@@ -12,8 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingDown, TrendingUp } from "lucide-react";
-import { toast } from "sonner";
 import { SellDialog } from "./sell-dialog";
+import Link from "next/link";
 
 interface Asset {
   _id: string;
@@ -94,9 +94,12 @@ export function AssetTable({ assets, market, priceMap, onRefresh }: AssetTablePr
               <TableRow key={asset._id} className=" group">
                 <TableCell>
                   <div className="flex flex-col">
-                    <span className="font-bold text-sm tracking-tight text-white">
+                    <Link
+                      href={`/dashboard/stocks/${market.toLowerCase()}/${encodeURIComponent(asset.symbol.replace(".IS", ""))}`}
+                      className="font-bold text-sm tracking-tight text-white hover:text-zinc-300 transition-colors"
+                    >
                       {asset.symbol.replace(".IS", "")}
-                    </span>
+                    </Link>
                     <span className="text-[10px] text-zinc-500 font-medium">
                       {market === "BIST" ? "Borsa İstanbul" : "ABD Borsası"}
                     </span>

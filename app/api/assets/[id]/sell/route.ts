@@ -49,6 +49,7 @@ export async function POST(
             type: "SELL",
             realizedProfit: profit,
             costBasis: originalAsset.buyPrice, // Alış maliyeti
+            market: originalAsset.market,
         });
 
         // 4. Orijinal varlığın lot sayısını düşür
